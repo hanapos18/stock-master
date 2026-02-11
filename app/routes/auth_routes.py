@@ -13,6 +13,7 @@ def login():
         password = request.form.get("password", "")
         user = auth_controller.verify_login(username, password)
         if user:
+            session.permanent = True
             data = auth_controller.load_user_session_data(user["id"])
             session["user"] = data["user"]
             session["stores"] = data["stores"]

@@ -1,4 +1,5 @@
 """StockMaster Flask 앱 팩토리"""
+from datetime import timedelta
 from flask import Flask
 from app.db import init_db
 
@@ -8,6 +9,7 @@ def create_app() -> Flask:
     import config
     application = Flask(__name__)
     application.secret_key = config.SECRET_KEY
+    application.permanent_session_lifetime = timedelta(hours=24)
     init_db(application)
     _register_blueprints(application)
     _register_context_processors(application)

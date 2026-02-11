@@ -12,7 +12,7 @@ def login_required(f):
     """로그인 필수 데코레이터"""
     @wraps(f)
     def decorated(*args, **kwargs):
-        if "user" not in session:
+        if "user" not in session or "business" not in session:
             return redirect(url_for("auth.login"))
         return f(*args, **kwargs)
     return decorated
