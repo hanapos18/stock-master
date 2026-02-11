@@ -11,7 +11,17 @@
     </select>
     <button class="btn btn-sm btn-outline-primary">Search</button>
   </form>
-  <a href="{{ url_for('product.create_product') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>New Product</a>
+  <div class="d-flex gap-2">
+    <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#excelUploadModal">
+      <i class="bi bi-file-earmark-excel me-1"></i>Excel Upload
+    </button>
+    <a href="{{ url_for('product.download_template') }}" class="btn btn-outline-success btn-sm">
+      <i class="bi bi-download me-1"></i>Template
+    </a>
+    <a href="{{ url_for('product.create_product') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-circle me-1"></i>New Product
+    </a>
+  </div>
 </div>
 <div class="card border-0 shadow-sm">
   <div class="table-responsive">
@@ -47,4 +57,53 @@
   </div>
 </div>
 <div class="mt-2 text-muted small">{{ products|length }} products</div>
+
+<!-- Excel Upload Modal -->
+<div class="modal fade" id="excelUploadModal" tabindex="-1" aria-labelledby="excelUploadModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="excelUploadModalLabel">
+          <i class="bi bi-file-earmark-excel text-success me-2"></i>Excel Product Upload
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{{ url_for('product.upload_excel') }}" enctype="multipart/form-data">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="excelFile" class="form-label fw-bold">Select Excel File (.xlsx)</label>
+            <input type="file" class="form-control" id="excelFile" name="excel_file"
+                   accept=".xlsx,.xls" required>
+          </div>
+          <div class="alert alert-info small mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            <strong>Instructions:</strong>
+            <ul class="mb-0 mt-1">
+              <li>Download the <a href="{{ url_for('product.download_template') }}">Template</a> first</li>
+              <li><strong>Code</strong> and <strong>Name</strong> are required fields</li>
+              <li>Category and Supplier names must match existing records</li>
+              <li>Existing products (same Code) will be <strong>updated</strong></li>
+              <li>Delete the sample rows before uploading</li>
+            </ul>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success" id="uploadBtn">
+            <i class="bi bi-upload me-1"></i>Upload
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('excelFile').addEventListener('change', function() {
+  const uploadBtn = document.getElementById('uploadBtn');
+  uploadBtn.disabled = !this.files.length;
+});
+</script>
 {% endblock %}

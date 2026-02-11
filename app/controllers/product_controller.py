@@ -1,6 +1,8 @@
 """상품/식자재 비즈니스 로직"""
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+from io import BytesIO
 from app.db import fetch_one, fetch_all, insert, execute
+from app.services.excel_service import parse_product_excel
 
 
 def load_products(business_id: int, category_id: Optional[int] = None,
@@ -84,3 +86,86 @@ def generate_product_code(business_id: int) -> str:
     )
     next_num = (row["max_num"] or 0) + 1 if row else 1
     return f"P{next_num:04d}"
+
+
+def import_products_from_excel(business_id: int, file_stream: BytesIO) -> Dict:
+    """엑셀 파일에서 상품을 일괄 등록/수정합니다.
+    Returns: {"created": int, "updated": int, "skipped": int, "errors": List[str]}
+    """
+    rows, parse_errors = parse_product_excel(file_stream)
+    result = {"created": 0, "updated": 0, "skipped": 0, "errors": list(parse_errors)}
+    if parse_errors and not rows:
+        return result
+    category_map = _build_category_map(business_id)
+    supplier_map = _build_supplier_map(business_id)
+    for row_data in rows:
+        try:
+            _process_import_row(business_id, row_data, category_map, supplier_map, result)
+        except Exception as e:
+            result["errors"].append(f"Code '{row_data.get('code', '?')}': {str(e)}")
+            result["skipped"] += 1
+    print(f"📊 엑셀 가져오기 완료 - 생성: {result['created']}, 수정: {result['updated']}, "
+          f"건너뜀: {result['skipped']}, 오류: {len(result['errors'])}")
+    return result
+
+
+def _build_category_map(business_id: int) -> Dict[str, int]:
+    """카테고리 이름 → ID 매핑을 생성합니다."""
+    categories = fetch_all(
+        "SELECT id, name FROM stk_categories WHERE business_id = %s", (business_id,))
+    return {c["name"].strip().lower(): c["id"] for c in categories}
+
+
+def _build_supplier_map(business_id: int) -> Dict[str, int]:
+    """공급업체 이름 → ID 매핑을 생성합니다."""
+    suppliers = fetch_all(
+        "SELECT id, name FROM stk_suppliers WHERE business_id = %s", (business_id,))
+    return {s["name"].strip().lower(): s["id"] for s in suppliers}
+
+
+def _process_import_row(business_id: int, row_data: Dict,
+                        category_map: Dict[str, int],
+                        supplier_map: Dict[str, int],
+                        result: Dict) -> None:
+    """엑셀 한 행을 처리하여 상품을 생성 또는 수정합니다."""
+    category_id = _resolve_category_id(row_data.get("category_name", ""), category_map)
+    supplier_id = _resolve_supplier_id(row_data.get("supplier_name", ""), supplier_map)
+    product_data = {
+        "business_id": business_id,
+        "code": row_data["code"],
+        "name": row_data["name"],
+        "barcode": row_data.get("barcode", ""),
+        "description": row_data.get("description", ""),
+        "storage_location": row_data.get("storage_location", ""),
+        "category_id": category_id,
+        "supplier_id": supplier_id,
+        "unit": row_data.get("unit", "ea"),
+        "unit_price": row_data.get("unit_price", 0),
+        "sell_price": row_data.get("sell_price", 0),
+        "min_stock": row_data.get("min_stock", 0),
+        "max_stock": row_data.get("max_stock"),
+    }
+    existing = fetch_one(
+        "SELECT id FROM stk_products WHERE business_id = %s AND code = %s",
+        (business_id, row_data["code"]),
+    )
+    if existing:
+        update_product(existing["id"], product_data)
+        result["updated"] += 1
+    else:
+        save_product(product_data)
+        result["created"] += 1
+
+
+def _resolve_category_id(name: str, category_map: Dict[str, int]) -> Optional[int]:
+    """카테고리 이름으로 ID를 조회합니다."""
+    if not name:
+        return None
+    return category_map.get(name.strip().lower())
+
+
+def _resolve_supplier_id(name: str, supplier_map: Dict[str, int]) -> Optional[int]:
+    """공급업체 이름으로 ID를 조회합니다."""
+    if not name:
+        return None
+    return supplier_map.get(name.strip().lower())
