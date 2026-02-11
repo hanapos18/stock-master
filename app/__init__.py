@@ -1,6 +1,8 @@
 """StockMaster Flask 앱 팩토리"""
+import os
 from datetime import timedelta
 from flask import Flask
+from flask_session import Session
 from app.db import init_db
 
 
@@ -10,6 +12,13 @@ def create_app() -> Flask:
     application = Flask(__name__)
     application.secret_key = config.SECRET_KEY
     application.permanent_session_lifetime = timedelta(hours=24)
+    application.config["SESSION_TYPE"] = "filesystem"
+    application.config["SESSION_FILE_DIR"] = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "flask_sessions")
+    application.config["SESSION_PERMANENT"] = True
+    application.config["SESSION_USE_SIGNER"] = True
+    application.config["SESSION_FILE_THRESHOLD"] = 500
+    Session(application)
     init_db(application)
     _register_blueprints(application)
     _register_context_processors(application)

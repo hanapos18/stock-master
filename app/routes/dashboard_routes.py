@@ -1,6 +1,6 @@
 """대시보드 라우트"""
 from functools import wraps
-from flask import Blueprint, render_template, session, redirect, url_for
+from flask import Blueprint, render_template, session, redirect, url_for, request
 from app.controllers.inventory_controller import load_inventory_summary
 from app.controllers.report_controller import load_low_stock_products
 from app.db import fetch_one, fetch_all
@@ -13,6 +13,10 @@ def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if "user" not in session or "business" not in session:
+            has_user = "user" in session
+            has_biz = "business" in session
+            keys = list(session.keys())
+            print(f"🔒 세션 무효 [{request.path}]: user={has_user}, business={has_biz}, keys={keys}")
             return redirect(url_for("auth.login"))
         return f(*args, **kwargs)
     return decorated
