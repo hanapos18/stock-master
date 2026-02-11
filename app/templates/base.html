@@ -44,9 +44,9 @@
           <i class="bi bi-people me-2"></i>Wholesale Clients</a>
         <a class="nav-link text-white" href="{{ url_for('wholesale.list_orders') }}">
           <i class="bi bi-receipt me-2"></i>Wholesale Orders</a>
+        {% endif %}
         <a class="nav-link text-white" href="{{ url_for('repackaging.list_rules') }}">
           <i class="bi bi-scissors me-2"></i>Repackaging</a>
-        {% endif %}
         {% if current_business and not current_business.pos_db_name %}
         <hr class="border-secondary my-2">
         <small class="text-muted px-3 mb-1">SALES</small>

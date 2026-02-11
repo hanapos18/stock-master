@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockMaster Business Logic Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        @media print {
+            .no-print { display: none; }
+            body { font-size: 11pt; }
+            .page-break { page-break-before: always; }
+            h2 { page-break-after: avoid; }
+            .mermaid svg { max-width: 100% !important; }
+        }
+        body {
+            font-family: 'Malgun Gothic', 'Segoe UI', Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 30px;
+            color: #333;
+            line-height: 1.7;
+            background: #fff;
+        }
+        h1 {
+            text-align: center;
+            color: #1a5276;
+            border-bottom: 3px solid #1a5276;
+            padding-bottom: 15px;
+            margin-bottom: 10px;
+            font-size: 26pt;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 11pt;
+        }
+        h2 {
+            color: #1a5276;
+            border-left: 5px solid #2980b9;
+            padding-left: 12px;
+            margin-top: 50px;
+        }
+        h3 {
+            color: #2c3e50;
+            margin-top: 25px;
+        }
+        .mermaid {
+            text-align: center;
+            margin: 25px 0;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0 25px 0;
+            font-size: 10pt;
+        }
+        th {
+            background: #2980b9;
+            color: white;
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        tr:nth-child(even) td {
+            background: #f8f9fa;
+        }
+        code {
+            background: #eef2f7;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 9.5pt;
+            color: #c0392b;
+        }
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 16px 20px;
+            border-radius: 6px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 10pt;
+            line-height: 1.5;
+            overflow-x: auto;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #ddd;
+            margin: 40px 0;
+        }
+        .type-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            color: white;
+            font-size: 9pt;
+            font-weight: 600;
+        }
+        .badge-in { background: #27ae60; }
+        .badge-out { background: #e74c3c; }
+        .badge-adjust { background: #f39c12; }
+        .badge-discard { background: #8e44ad; }
+        .badge-move { background: #3498db; }
+        .print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 24px;
+            background: #2980b9;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11pt;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 1000;
+        }
+        .print-btn:hover { background: #1a6da0; }
+        .footer {
+            text-align: center;
+            color: #999;
+            font-size: 9pt;
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">Print / Save PDF</button>
+
+<h1>StockMaster</h1>
+<p class="subtitle">비즈니스 로직 다이어그램 — 상품 등록, 매입/입고, 판매/출고, 재고조사, 레시피 차감, 도매, 소분</p>
+
+<!-- ===== 1. Overview ===== -->
+<h2>1. 전체 시스템 구조 (Overview)</h2>
+<p>모든 재고 변동은 <code>inventory_controller.py</code>를 통해 처리되며, <code>stk_transactions</code> 테이블에 기록됩니다.</p>
+
+<div class="mermaid">
+flowchart TB
+    subgraph masters [Master Data]
+        Product[Products]
+        Category[Categories]
+        Supplier[Suppliers]
+        Store[Stores]
+    end
+    subgraph operations [Operations]
+        Purchase["Purchase — 매입"]
+        Sale["Sale — 판매"]
+        Wholesale["Wholesale — 도매"]
+        Recipe["Recipe — 레시피차감"]
+        Repackaging["Repackaging — 소분"]
+        StockCount["Stock Count — 재고조사"]
+    end
+    subgraph core [Core Engine]
+        InvCtrl["Inventory Controller"]
+        StockIn["stock_in  +qty"]
+        StockOut["stock_out  -qty"]
+        StockAdjust["stock_adjust  =qty"]
+    end
+    subgraph storage [Storage]
+        Inventory["stk_inventory"]
+        Transactions["stk_transactions"]
+    end
+    Purchase -->|receive| StockIn
+    Sale -->|confirm| StockOut
+    Wholesale -->|ship| StockOut
+    Recipe -->|deduct| StockOut
+    Repackaging -->|source out| StockOut
+    Repackaging -->|target in| StockIn
+    StockCount -->|approve| StockAdjust
+    StockIn --> InvCtrl
+    StockOut --> InvCtrl
+    StockAdjust --> InvCtrl
+    InvCtrl --> Inventory
+    InvCtrl --> Transactions
+</div>
+
+<hr>
+
+<!-- ===== 2. Purchase ===== -->
+<h2>2. 매입/입고 흐름 (Purchase Flow)</h2>
+
+<div class="mermaid">
+flowchart LR
+    A[Create Purchase] -->|draft| B[Purchase Order]
+    B --> C{Receive?}
+    C -->|Yes| D[receive_purchase]
+    C -->|Cancel| E["status: cancelled"]
+    D --> F["For each item: process_stock_in()"]
+    F --> G["Inventory +qty"]
+    F --> H["Transaction: type=in"]
+    D --> I["status: received"]
+</div>
+
+<table>
+    <tr><th>단계</th><th>함수</th><th>설명</th></tr>
+    <tr><td>매입 생성</td><td><code>purchase_controller.save_purchase()</code></td><td>Draft 상태로 매입 주문 생성</td></tr>
+    <tr><td>입고 처리</td><td><code>purchase_controller.receive_purchase()</code></td><td>각 항목을 <code>process_stock_in()</code> 호출</td></tr>
+    <tr><td>참조 타입</td><td><code>reference_type: purchase</code></td><td>트랜잭션에서 매입 추적 가능</td></tr>
+</table>
+
+<hr>
+
+<!-- ===== 3. Sale ===== -->
+<h2>3. 판매/출고 흐름 (Sale Flow)</h2>
+
+<div class="mermaid">
+flowchart LR
+    A[Create Sale] -->|draft| B[Sale Order]
+    B --> C{Confirm?}
+    C -->|Yes| D[confirm_sale]
+    C -->|Cancel| E["status: cancelled"]
+    D --> F["For each item: process_stock_out()"]
+    F --> G["Inventory -qty"]
+    F --> H["Transaction: type=out"]
+    D --> I["status: confirmed"]
+</div>
+
+<table>
+    <tr><th>단계</th><th>함수</th><th>설명</th></tr>
+    <tr><td>판매 생성</td><td><code>sales_controller.save_sale()</code></td><td>Draft 상태로 판매 생성</td></tr>
+    <tr><td>판매 확정</td><td><code>sales_controller.confirm_sale()</code></td><td>각 항목을 <code>process_stock_out()</code> 호출하여 재고 차감</td></tr>
+    <tr><td>참조 타입</td><td><code>reference_type: sale</code></td><td>트랜잭션에서 판매 추적 가능</td></tr>
+</table>
+
+<hr>
+
+<!-- ===== 4. Recipe ===== -->
+<div class="page-break"></div>
+<h2>4. 레시피 기반 재고 차감 (Recipe Deduction Flow)</h2>
+<p>식당에서 메뉴 판매 시 레시피에 등록된 원재료를 자동 차감합니다.</p>
+
+<div class="mermaid">
+flowchart TB
+    A["Menu Sold: Fried Rice x2"] --> B[load_recipe]
+    B --> C["Ingredients: Rice 0.3kg, Oil 0.05L, Sauce 0.02L"]
+    C --> D["qty × sold_quantity"]
+    D --> E["Rice: 0.3 × 2 = 0.6kg"]
+    D --> F["Oil: 0.05 × 2 = 0.1L"]
+    D --> G["Sauce: 0.02 × 2 = 0.04L"]
+    E --> H["process_stock_out()"]
+    F --> H
+    G --> H
+    H --> I["Inventory -qty per ingredient"]
+    H --> J["Transaction: type=out"]
+</div>
+
+<table>
+    <tr><th>단계</th><th>함수</th><th>설명</th></tr>
+    <tr><td>레시피 차감</td><td><code>recipe_controller.deduct_by_recipe()</code></td><td>recipe_id, sold_quantity, store_id</td></tr>
+    <tr><td>차감 계산</td><td><code>ingredient.quantity × sold_quantity</code></td><td>각 원재료별 사용량 계산</td></tr>
+    <tr><td>원가 계산</td><td><code>calculate_recipe_cost()</code></td><td>원재료 단가 기반 레시피 원가 산출</td></tr>
+</table>
+
+<h3>레시피 원가 계산 예시</h3>
+<pre>Fried Rice (1 plate):
+  Rice    0.3kg × ₩2,500/kg = ₩750
+  Oil     0.05L × ₩8,000/L  = ₩400
+  Sauce   0.02L × ₩5,000/L  = ₩100
+  ──────────────────────────────────
+  Total Cost per plate       = ₩1,250</pre>
+
+<hr>
+
+<!-- ===== 5. Stock Count ===== -->
+<h2>5. 재고조사 흐름 (Stock Count Flow)</h2>
+<p>실물 재고와 시스템 재고를 비교하여 차이를 조정합니다.</p>
+
+<div class="mermaid">
+flowchart LR
+    A[Create Count] --> B["Load system qty from stk_inventory"]
+    B --> C["User inputs actual qty"]
+    C --> D["difference = actual - system"]
+    D --> E{Approve?}
+    E -->|Yes| F["For each diff ≠ 0: process_stock_adjust()"]
+    F --> G["Inventory = actual qty"]
+    F --> H["Transaction: type=adjust"]
+    E --> I["status: approved"]
+</div>
+
+<table>
+    <tr><th>단계</th><th>함수</th><th>설명</th></tr>
+    <tr><td>실사 생성</td><td><code>create_stock_count()</code></td><td>시스템 재고 자동 로드</td></tr>
+    <tr><td>수량 입력</td><td><code>update_stock_count_items()</code></td><td>실제 수량 입력, 차이 자동 계산</td></tr>
+    <tr><td>실사 승인</td><td><code>approve_stock_count()</code></td><td>차이가 있는 항목만 <code>process_stock_adjust()</code> 호출</td></tr>
+</table>
+
+<h3>재고조사 예시</h3>
+<table>
+    <tr><th>상품</th><th>시스템 수량</th><th>실제 수량</th><th>차이</th><th>조치</th></tr>
+    <tr><td>Rice 10kg</td><td>50</td><td>48</td><td style="color:#e74c3c;font-weight:600">-2</td><td>adjust to 48</td></tr>
+    <tr><td>Soy Sauce 1L</td><td>30</td><td>30</td><td style="color:#888">0</td><td>no change</td></tr>
+    <tr><td>Sugar 1kg</td><td>20</td><td>22</td><td style="color:#27ae60;font-weight:600">+2</td><td>adjust to 22</td></tr>
+</table>
+
+<hr>
+
+<!-- ===== 6. Wholesale ===== -->
+<div class="page-break"></div>
+<h2>6. 도매 주문 흐름 (Wholesale Flow)</h2>
+<p>마트 업종에서 도매 거래처에 대량 출고합니다.</p>
+
+<div class="mermaid">
+flowchart LR
+    A[Create Order] -->|draft| B[Wholesale Order]
+    B --> C{Ship?}
+    C -->|Yes| D[ship_wholesale_order]
+    C -->|Cancel| E["status: cancelled"]
+    D --> F["For each item: process_stock_out()"]
+    F --> G["Inventory -qty"]
+    F --> H["Transaction: type=out, ref=wholesale"]
+    D --> I["status: shipped"]
+</div>
+
+<table>
+    <tr><th>단계</th><th>함수</th><th>설명</th></tr>
+    <tr><td>주문 생성</td><td><code>save_wholesale_order()</code></td><td>업체별 할인가 자동 적용</td></tr>
+    <tr><td>출고 처리</td><td><code>ship_wholesale_order()</code></td><td>각 항목을 <code>process_stock_out()</code> 호출</td></tr>
+    <tr><td>할인 체계</td><td><code>stk_wholesale_pricing</code></td><td>업체별 할인율 또는 고정가</td></tr>
+    <tr><td>참조 타입</td><td><code>reference_type: wholesale_order</code></td><td>트랜잭션에서 도매 추적 가능</td></tr>
+</table>
+
+<hr>
+
+<!-- ===== 7. Repackaging ===== -->
+<h2>7. 소분/리패키징 흐름 (Repackaging Flow)</h2>
+<p>마트 업종에서 대용량 상품을 소량으로 소분합니다.</p>
+
+<div class="mermaid">
+flowchart LR
+    A["Execute Rule: Rice 10kg → Rice 1kg"] --> B["ratio = 10"]
+    B --> C["source: 1 × 10kg bag"]
+    B --> D["target: 1 × 10 = 10 × 1kg bags"]
+    C --> E["process_stock_out(source, qty=1)"]
+    D --> F["process_stock_in(target, qty=10)"]
+    E --> G["Source Inventory -1"]
+    F --> H["Target Inventory +10"]
+</div>
+
+<table>
+    <tr><th>단계</th><th>함수</th><th>설명</th></tr>
+    <tr><td>규칙 설정</td><td><code>save_repackaging_rule()</code></td><td>원재료 → 소분상품, 비율 설정</td></tr>
+    <tr><td>소분 실행</td><td><code>execute_repackaging()</code></td><td>원재료 출고 + 소분상품 입고 동시 처리</td></tr>
+    <tr><td>비율 계산</td><td><code>target_qty = source_qty × ratio</code></td><td>자동 계산</td></tr>
+</table>
+
+<h3>소분 예시</h3>
+<pre>Rule: Rice 10kg → Rice 1kg (ratio = 10)
+Execute: source_qty = 2
+
+Result:
+  Rice 10kg:  -2 bags  (stock out)
+  Rice 1kg:  +20 bags  (stock in)</pre>
+
+<hr>
+
+<!-- ===== 8. Transaction Types ===== -->
+<div class="page-break"></div>
+<h2>8. 재고 변동 유형 요약 (Inventory Transaction Types)</h2>
+
+<div class="mermaid">
+flowchart TB
+    subgraph increase ["Inventory Increase"]
+        TxIn["in: 매입입고, 소분입고"]
+    end
+    subgraph decrease ["Inventory Decrease"]
+        TxOut["out: 판매, 도매, 레시피차감, 소분출고"]
+        TxDiscard["discard: 폐기"]
+    end
+    subgraph neutral ["Inventory Neutral"]
+        TxAdjust["adjust: 재고조사 조정"]
+        TxMove["move: 위치간 이동"]
+    end
+    TxIn --> DB["stk_inventory  +qty"]
+    TxOut --> DB2["stk_inventory  -qty"]
+    TxDiscard --> DB2
+    TxAdjust --> DB3["stk_inventory  =qty"]
+    TxMove --> DB4["location A  -qty,  location B  +qty"]
+</div>
+
+<table>
+    <tr><th>Type</th><th>설명</th><th>트리거</th></tr>
+    <tr><td><span class="type-badge badge-in">in</span></td><td>입고</td><td>매입 Receive, 소분 입고</td></tr>
+    <tr><td><span class="type-badge badge-out">out</span></td><td>출고</td><td>판매 Confirm, 도매 Ship, 레시피 Deduct, 소분 출고</td></tr>
+    <tr><td><span class="type-badge badge-adjust">adjust</span></td><td>조정</td><td>재고조사 Approve</td></tr>
+    <tr><td><span class="type-badge badge-discard">discard</span></td><td>폐기</td><td>수동 폐기 처리</td></tr>
+    <tr><td><span class="type-badge badge-move">move</span></td><td>이동</td><td>위치간 재고 이동 (warehouse → store 등)</td></tr>
+</table>
+
+<hr>
+
+<!-- ===== 9. DB Schema ===== -->
+<h2>9. 데이터베이스 관계도 (Database Schema)</h2>
+
+<div class="mermaid">
+erDiagram
+    stk_businesses ||--o{ stk_stores : has
+    stk_businesses ||--o{ stk_products : has
+    stk_businesses ||--o{ stk_categories : has
+    stk_businesses ||--o{ stk_suppliers : has
+    stk_businesses ||--o{ stk_users : has
+    stk_products ||--o{ stk_inventory : tracked_in
+    stk_products ||--o{ stk_purchase_items : purchased_as
+    stk_products ||--o{ stk_sale_items : sold_as
+    stk_products ||--o{ stk_recipe_items : used_in
+    stk_stores ||--o{ stk_inventory : stores
+    stk_stores ||--o{ stk_transactions : logs
+    stk_purchases ||--o{ stk_purchase_items : contains
+    stk_sales ||--o{ stk_sale_items : contains
+    stk_recipes ||--o{ stk_recipe_items : contains
+    stk_wholesale_orders ||--o{ stk_wholesale_order_items : contains
+    stk_stock_counts ||--o{ stk_stock_count_items : contains
+    stk_suppliers ||--o{ stk_purchases : supplies
+    stk_wholesale_clients ||--o{ stk_wholesale_orders : orders
+</div>
+
+<hr>
+
+<!-- ===== 10. Excel ===== -->
+<h2>10. 엑셀 Import/Export 지원</h2>
+
+<table>
+    <tr><th>모듈</th><th>Template</th><th>Upload</th><th>Export</th></tr>
+    <tr><td>Products</td><td>✅</td><td>✅ Create/Update by Code</td><td>✅</td></tr>
+    <tr><td>Purchases</td><td>✅</td><td>✅ Group by Date+Supplier</td><td>✅</td></tr>
+    <tr><td>Recipes</td><td>✅</td><td>✅ Group by Recipe Name</td><td>✅</td></tr>
+</table>
+
+<div class="footer">
+    <p>Generated: 2026-02-11 | StockMaster Inventory Management System</p>
+</div>
+
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'default',
+        flowchart: { useMaxWidth: true, htmlLabels: true },
+        securityLevel: 'loose'
+    });
+</script>
+
+</body>
+</html>

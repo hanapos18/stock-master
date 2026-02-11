@@ -192,17 +192,26 @@ CREATE TABLE IF NOT EXISTS stk_recipe_items (
     FOREIGN KEY (product_id) REFERENCES stk_products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- ── 소분 / 리패키징 (마트용) ──
+-- ── 소분 / 리패키징 (전 업종) ──
 CREATE TABLE IF NOT EXISTS stk_repackaging (
     id INT AUTO_INCREMENT PRIMARY KEY,
     business_id INT NOT NULL,
+    name VARCHAR(100) DEFAULT NULL COMMENT 'rule name (e.g. 한우 앞다리 소분)',
     source_product_id INT NOT NULL COMMENT 'source product (bulk)',
-    target_product_id INT NOT NULL COMMENT 'target product (split)',
-    ratio DECIMAL(10,4) NOT NULL COMMENT 'conversion ratio (1 to N)',
+    target_product_id INT DEFAULT NULL COMMENT '[deprecated] single target (legacy)',
+    ratio DECIMAL(10,4) DEFAULT NULL COMMENT '[deprecated] single ratio (legacy)',
     is_active TINYINT(1) DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (business_id) REFERENCES stk_businesses(id) ON DELETE CASCADE,
-    FOREIGN KEY (source_product_id) REFERENCES stk_products(id) ON DELETE CASCADE,
+    FOREIGN KEY (source_product_id) REFERENCES stk_products(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS stk_repackaging_targets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    repackaging_id INT NOT NULL,
+    target_product_id INT NOT NULL COMMENT 'target product (split)',
+    ratio DECIMAL(10,4) NOT NULL COMMENT 'qty per 1 source unit',
+    FOREIGN KEY (repackaging_id) REFERENCES stk_repackaging(id) ON DELETE CASCADE,
     FOREIGN KEY (target_product_id) REFERENCES stk_products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 

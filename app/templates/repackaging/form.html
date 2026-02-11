@@ -2,37 +2,76 @@
 {% block title %}{{ 'Edit' if rule else 'New' }} Repackaging Rule{% endblock %}
 {% block page_title %}{{ 'Edit' if rule else 'New' }} Repackaging Rule{% endblock %}
 {% block content %}
-<div class="card border-0 shadow-sm" style="max-width:700px;">
+<style>
+.product-search-results{position:absolute;z-index:100;width:100%;max-height:200px;overflow-y:auto;background:#fff;border:1px solid #dee2e6;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.product-search-results .list-group-item{cursor:pointer;padding:6px 12px;font-size:.875rem}
+.product-search-results .list-group-item:hover{background:#e9ecef}
+.target-row{background:#f8f9fa;border:1px solid #e9ecef;border-radius:6px;padding:12px;margin-bottom:8px}
+</style>
+
+<div class="card border-0 shadow-sm" style="max-width:800px;">
   <div class="card-body">
-    <form method="post">
-      <div class="row g-3">
-        <div class="col-12">
-          <label class="form-label">Source Product (Bulk) *</label>
-          <div class="position-relative">
-            <input type="text" id="sourceSearch" class="form-control" placeholder="Search source product..." autocomplete="off"
-              value="{{ rule.source_code ~ ' - ' ~ rule.source_name if rule else '' }}">
-            <div id="sourceResults" class="product-search-results" style="display:none;"></div>
-            <input type="hidden" name="source_product_id" id="sourceProductId" required
-              value="{{ rule.source_product_id if rule else '' }}">
-          </div>
-        </div>
-        <div class="col-12">
-          <label class="form-label">Target Product (Split) *</label>
-          <div class="position-relative">
-            <input type="text" id="targetSearch" class="form-control" placeholder="Search target product..." autocomplete="off"
-              value="{{ rule.target_code ~ ' - ' ~ rule.target_name if rule else '' }}">
-            <div id="targetResults" class="product-search-results" style="display:none;"></div>
-            <input type="hidden" name="target_product_id" id="targetProductId" required
-              value="{{ rule.target_product_id if rule else '' }}">
-          </div>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Conversion Ratio *</label>
-          <input type="number" name="ratio" class="form-control" step="0.0001" min="0.0001" required
-            value="{{ rule.ratio if rule else '' }}" placeholder="e.g., 20 (1 source = 20 target)">
-          <small class="text-muted">How many target units from 1 source unit</small>
+    <form method="post" id="ruleForm">
+      <!-- Rule Name -->
+      <div class="mb-3">
+        <label class="form-label">Rule Name *</label>
+        <input type="text" name="name" class="form-control" required placeholder="e.g. 한우 앞다리 소분, 쌀 10kg 소분"
+          value="{{ rule.name if rule else '' }}">
+      </div>
+
+      <!-- Source Product -->
+      <div class="mb-3">
+        <label class="form-label">Source Product (원재료) *</label>
+        <div class="position-relative">
+          <input type="text" id="sourceSearch" class="form-control" placeholder="Search source product..." autocomplete="off"
+            value="{{ rule.source_code ~ ' - ' ~ rule.source_name ~ ' (' ~ rule.source_unit ~ ')' if rule else '' }}">
+          <div id="sourceResults" class="product-search-results" style="display:none;"></div>
+          <input type="hidden" name="source_product_id" id="sourceProductId" required
+            value="{{ rule.source_product_id if rule else '' }}">
         </div>
       </div>
+
+      <hr>
+
+      <!-- Target Products (1:N) -->
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <label class="form-label mb-0"><strong>Target Products (소분 결과물)</strong></label>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="addTargetBtn">
+          <i class="bi bi-plus-circle me-1"></i>Add Target
+        </button>
+      </div>
+
+      <div id="targetContainer">
+        <!-- 기존 타겟들 (Edit 시) -->
+        {% if rule and rule.targets %}
+        {% for t in rule.targets %}
+        <div class="target-row" data-idx="{{ loop.index0 }}">
+          <div class="row g-2 align-items-end">
+            <div class="col-md-6">
+              <label class="form-label small">Target Product</label>
+              <div class="position-relative">
+                <input type="text" class="form-control target-search" data-idx="{{ loop.index0 }}" autocomplete="off"
+                  value="{{ t.target_code }} - {{ t.target_name }} ({{ t.target_unit }})">
+                <div class="product-search-results target-results" style="display:none;"></div>
+                <input type="hidden" name="target_product_id[]" value="{{ t.target_product_id }}">
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small">Ratio (per 1 source)</label>
+              <input type="number" name="target_ratio[]" class="form-control" step="0.0001" min="0.0001" required
+                value="{{ t.ratio }}" placeholder="e.g. 3">
+            </div>
+            <div class="col-md-2">
+              <button type="button" class="btn btn-outline-danger btn-sm w-100 remove-target-btn">
+                <i class="bi bi-trash"></i> Remove
+              </button>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+      </div>
+
       <div class="mt-3">
         <button type="submit" class="btn btn-primary">Save Rule</button>
         <a href="{{ url_for('repackaging.list_rules') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
@@ -41,21 +80,123 @@
   </div>
 </div>
 
-<div class="mt-3 p-3 bg-light rounded" style="max-width:700px;">
-  <h6><i class="bi bi-lightbulb me-1"></i>Example</h6>
-  <p class="mb-0 small">Source: <strong>Rice 10kg bag</strong> → Target: <strong>Rice 500g pack</strong>, Ratio: <strong>20</strong><br>
-  (1 bag of 10kg produces 20 packs of 500g each)</p>
+<!-- Examples -->
+<div class="mt-3 p-3 bg-light rounded" style="max-width:800px;">
+  <h6><i class="bi bi-lightbulb me-1"></i>Examples</h6>
+  <div class="small">
+    <p class="mb-2"><strong>마트 (1:1):</strong> Source: 쌀 10kg → Target: 쌀 1kg, Ratio: 10<br>
+    <span class="text-muted">(10kg 1포 → 1kg 10봉지)</span></p>
+    <p class="mb-0"><strong>식당 (1:N):</strong> Source: 한우 앞다리 10kg →<br>
+    &nbsp;&nbsp;Target 1: 불고기용 — Ratio: 3 (3kg)<br>
+    &nbsp;&nbsp;Target 2: 국거리용 — Ratio: 2 (2kg)<br>
+    &nbsp;&nbsp;Target 3: 장조림용 — Ratio: 2 (2kg)<br>
+    &nbsp;&nbsp;Target 4: 뼈/사골 — Ratio: 3 (3kg)</p>
+  </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
+/* ── Source product search ── */
 initProductSearch('sourceSearch', 'sourceResults', function(p) {
   document.getElementById('sourceProductId').value = p.id;
   document.getElementById('sourceSearch').value = p.code + ' - ' + p.name + ' (' + p.unit + ')';
 });
-initProductSearch('targetSearch', 'targetResults', function(p) {
-  document.getElementById('targetProductId').value = p.id;
-  document.getElementById('targetSearch').value = p.code + ' - ' + p.name + ' (' + p.unit + ')';
+
+/* ── Target rows ── */
+let targetIdx = {{ (rule.targets|length) if rule and rule.targets else 0 }};
+
+document.getElementById('addTargetBtn').addEventListener('click', addTargetRow);
+
+function addTargetRow() {
+  const container = document.getElementById('targetContainer');
+  const idx = targetIdx++;
+  const row = document.createElement('div');
+  row.className = 'target-row';
+  row.dataset.idx = idx;
+  row.innerHTML = `
+    <div class="row g-2 align-items-end">
+      <div class="col-md-6">
+        <label class="form-label small">Target Product</label>
+        <div class="position-relative">
+          <input type="text" class="form-control target-search" data-idx="${idx}" autocomplete="off" placeholder="Search target product...">
+          <div class="product-search-results target-results" style="display:none;"></div>
+          <input type="hidden" name="target_product_id[]" value="">
+        </div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small">Ratio (per 1 source)</label>
+        <input type="number" name="target_ratio[]" class="form-control" step="0.0001" min="0.0001" required placeholder="e.g. 3">
+      </div>
+      <div class="col-md-2">
+        <button type="button" class="btn btn-outline-danger btn-sm w-100 remove-target-btn">
+          <i class="bi bi-trash"></i> Remove
+        </button>
+      </div>
+    </div>
+  `;
+  container.appendChild(row);
+  initTargetSearch(row, idx);
+}
+
+function initTargetSearch(row, idx) {
+  const input = row.querySelector('.target-search');
+  const results = row.querySelector('.target-results');
+  const hiddenId = row.querySelector('input[name="target_product_id[]"]');
+  let timer = null;
+  input.addEventListener('input', function() {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 1) { results.innerHTML = ''; results.style.display = 'none'; return; }
+    timer = setTimeout(function() {
+      fetch('/products/api/list?search=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.length) { results.innerHTML = '<div class="p-2 text-muted">No products found</div>'; results.style.display = 'block'; return; }
+          results.innerHTML = data.map(function(p) {
+            return '<div class="list-group-item" data-id="' + p.id + '" data-code="' + p.code + '" data-name="' + p.name + '" data-unit="' + p.unit + '">' + p.code + ' - ' + p.name + ' (' + p.unit + ')</div>';
+          }).join('');
+          results.style.display = 'block';
+          results.querySelectorAll('.list-group-item').forEach(function(item) {
+            item.addEventListener('click', function() {
+              hiddenId.value = item.dataset.id;
+              input.value = item.dataset.code + ' - ' + item.dataset.name + ' (' + item.dataset.unit + ')';
+              results.innerHTML = '';
+              results.style.display = 'none';
+            });
+          });
+        });
+    }, 300);
+  });
+  document.addEventListener('click', function(e) {
+    if (!input.contains(e.target) && !results.contains(e.target)) {
+      results.style.display = 'none';
+    }
+  });
+}
+
+/* Init search for existing target rows (Edit mode) */
+document.querySelectorAll('.target-row').forEach(function(row) {
+  initTargetSearch(row, row.dataset.idx);
+});
+
+/* Remove target */
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.remove-target-btn');
+  if (btn) {
+    btn.closest('.target-row').remove();
+  }
+});
+
+/* Validate at least 1 target */
+document.getElementById('ruleForm').addEventListener('submit', function(e) {
+  const targets = document.querySelectorAll('input[name="target_product_id[]"]');
+  let hasTarget = false;
+  targets.forEach(function(t) { if (t.value) hasTarget = true; });
+  if (!hasTarget) {
+    e.preventDefault();
+    alert('Please add at least one target product.');
+  }
 });
 </script>
 {% endblock %}

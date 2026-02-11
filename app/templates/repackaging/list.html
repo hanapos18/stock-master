@@ -6,51 +6,116 @@
   <h5>Repackaging Rules</h5>
   <a href="{{ url_for('repackaging.create_rule') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>New Rule</a>
 </div>
-<div class="card border-0 shadow-sm"><div class="table-responsive">
-  <table class="table table-hover mb-0"><thead class="table-light"><tr>
-    <th>Source Product</th><th>→</th><th>Target Product</th><th>Ratio</th><th>Actions</th>
-  </tr></thead><tbody>
-    {% for r in rules %}<tr>
-      <td><code>{{ r.source_code }}</code> {{ r.source_name }} ({{ r.source_unit }})</td>
-      <td><i class="bi bi-arrow-right text-primary"></i></td>
-      <td><code>{{ r.target_code }}</code> {{ r.target_name }} ({{ r.target_unit }})</td>
-      <td><span class="badge bg-info">1 → {{ r.ratio }}</span></td>
-      <td>
-        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#execModal{{ r.id }}"><i class="bi bi-play-fill me-1"></i>Execute</button>
-        <a href="{{ url_for('repackaging.edit_rule', rule_id=r.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
-        <form method="post" action="{{ url_for('repackaging.delete_rule', rule_id=r.id) }}" class="d-inline" onsubmit="return confirm('Deactivate this rule?')">
-          <button class="btn btn-sm btn-outline-danger">Delete</button>
-        </form>
-      </td>
-    </tr>
-    <!-- Execute Modal -->
-    <div class="modal fade" id="execModal{{ r.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-      <form method="post" action="{{ url_for('repackaging.execute_rule', rule_id=r.id) }}">
-      <div class="modal-header"><h5 class="modal-title">Execute Repackaging</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-      <div class="modal-body">
-        <p><strong>{{ r.source_name }}</strong> ({{ r.source_unit }}) → <strong>{{ r.target_name }}</strong> ({{ r.target_unit }})</p>
-        <p class="text-muted">Ratio: 1 source = {{ r.ratio }} target</p>
-        <div class="mb-3">
-          <label class="form-label">Source Quantity to Repackage</label>
-          <input type="number" name="source_quantity" class="form-control" step="0.01" min="0.01" required
-            onchange="this.closest('.modal-body').querySelector('.target-preview').textContent = (parseFloat(this.value) * {{ r.ratio }}).toFixed(4)">
-        </div>
-        <p>Target output: <strong class="target-preview text-success">0</strong> {{ r.target_unit }}</p>
-      </div>
-      <div class="modal-footer"><button type="submit" class="btn btn-success">Execute Repackaging</button></div>
+
+{% for r in rules %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+    <div>
+      <strong>{{ r.name or 'Unnamed Rule' }}</strong>
+      <span class="text-muted ms-2">
+        <i class="bi bi-box-seam me-1"></i><code>{{ r.source_code }}</code> {{ r.source_name }} ({{ r.source_unit }})
+      </span>
+    </div>
+    <div>
+      <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#execModal{{ r.id }}">
+        <i class="bi bi-play-fill me-1"></i>Execute</button>
+      <a href="{{ url_for('repackaging.edit_rule', rule_id=r.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+      <form method="post" action="{{ url_for('repackaging.delete_rule', rule_id=r.id) }}" class="d-inline"
+        onsubmit="return confirm('Deactivate this rule?')">
+        <button class="btn btn-sm btn-outline-danger">Delete</button>
       </form>
-    </div></div></div>
-    {% endfor %}
-    {% if not rules %}<tr><td colspan="5" class="text-center text-muted py-3">No repackaging rules defined</td></tr>{% endif %}
-  </tbody></table>
-</div></div>
+    </div>
+  </div>
+  <div class="card-body py-2">
+    <table class="table table-sm mb-0">
+      <thead class="table-light">
+        <tr><th style="width:40px"></th><th>Target Product</th><th style="width:120px">Ratio</th></tr>
+      </thead>
+      <tbody>
+        {% for t in r.targets %}
+        <tr>
+          <td class="text-center"><i class="bi bi-arrow-right text-primary"></i></td>
+          <td><code>{{ t.target_code }}</code> {{ t.target_name }} ({{ t.target_unit }})</td>
+          <td><span class="badge bg-info">1 → {{ t.ratio }}</span></td>
+        </tr>
+        {% endfor %}
+        {% if not r.targets %}
+        <tr><td colspan="3" class="text-muted text-center">No targets defined</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Execute Modal -->
+<div class="modal fade" id="execModal{{ r.id }}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('repackaging.execute_rule', rule_id=r.id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title">Execute: {{ r.name or r.source_name }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2"><strong>Source:</strong> {{ r.source_name }} ({{ r.source_unit }})</p>
+          <div class="mb-3">
+            <label class="form-label">Source Quantity</label>
+            <input type="number" name="source_quantity" class="form-control source-qty-input"
+              data-rule="{{ r.id }}" step="0.01" min="0.01" required>
+          </div>
+          <hr>
+          <p class="mb-2"><strong>Expected Output:</strong></p>
+          <table class="table table-sm mb-0">
+            <thead class="table-light"><tr><th>Target</th><th>Qty</th></tr></thead>
+            <tbody>
+              {% for t in r.targets %}
+              <tr>
+                <td>{{ t.target_name }} ({{ t.target_unit }})</td>
+                <td><span class="target-preview-{{ r.id }}" data-ratio="{{ t.ratio }}">0</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Execute Repackaging</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% if not rules %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center text-muted py-4">
+    No repackaging rules defined. <a href="{{ url_for('repackaging.create_rule') }}">Create one</a>.
+  </div>
+</div>
+{% endif %}
 
 <div class="mt-3 p-3 bg-light rounded">
   <h6 class="mb-2"><i class="bi bi-info-circle me-1"></i>How Repackaging Works</h6>
   <ul class="small mb-0">
-    <li><strong>Rule:</strong> Define a conversion from a bulk source product to a smaller target product (e.g., 10kg bag → 500g packs)</li>
-    <li><strong>Ratio:</strong> How many target units are produced from 1 source unit (e.g., ratio=20 means 1kg → 20 × 50g)</li>
-    <li><strong>Execute:</strong> Enter the source quantity to consume, and the target quantity is auto-calculated and added to inventory</li>
+    <li><strong>1:1 (마트):</strong> 쌀 10kg → 쌀 1kg x 10 (같은 상품, 포장 단위만 다름)</li>
+    <li><strong>1:N (식당):</strong> 한우 앞다리 10kg → 불고기용 3kg + 국거리 2kg + 장조림 2kg + 뼈 3kg</li>
+    <li><strong>Execute:</strong> 원재료 수량 입력 → 각 타겟 자동 계산 후 재고 반영</li>
   </ul>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* 실행 모달: 소스 수량 입력 시 타겟 예상 수량 자동 계산 */
+document.querySelectorAll('.source-qty-input').forEach(function(input) {
+  input.addEventListener('input', function() {
+    const ruleId = this.dataset.rule;
+    const srcQty = parseFloat(this.value) || 0;
+    document.querySelectorAll('.target-preview-' + ruleId).forEach(function(span) {
+      const ratio = parseFloat(span.dataset.ratio) || 0;
+      span.textContent = (srcQty * ratio).toFixed(2);
+    });
+  });
+});
+</script>
 {% endblock %}
