@@ -14,6 +14,7 @@ def create_app() -> Flask:
     _register_blueprints(application)
     _register_context_processors(application)
     _register_template_filters(application)
+    _register_error_handlers(application)
     return application
 
 
@@ -78,6 +79,27 @@ def _register_template_filters(application: Flask) -> None:
         if "." in formatted:
             formatted = formatted.rstrip("0").rstrip(".")
         return formatted
+
+
+def _register_error_handlers(application: Flask) -> None:
+    """글로벌 에러 핸들러를 등록합니다."""
+    from flask import session, redirect, url_for, flash
+
+    @application.errorhandler(500)
+    def handle_500(error):
+        print(f"❌ 서버 오류 발생: {error}")
+        if "user" in session:
+            flash("A server error occurred. Please try again.", "danger")
+            return redirect(url_for("dashboard.index"))
+        return redirect(url_for("auth.login"))
+
+    @application.errorhandler(Exception)
+    def handle_exception(error):
+        print(f"❌ 예외 발생: {type(error).__name__}: {error}")
+        if "user" in session:
+            flash(f"Error: {type(error).__name__}", "danger")
+            return redirect(url_for("dashboard.index"))
+        return redirect(url_for("auth.login"))
 
 
 def _register_context_processors(application: Flask) -> None:

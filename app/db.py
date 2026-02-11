@@ -24,9 +24,14 @@ def init_db(application: Flask) -> None:
 
 
 def get_db() -> pymysql.connections.Connection:
-    """현재 요청의 DB 연결을 반환합니다 (없으면 새로 생성)."""
+    """현재 요청의 DB 연결을 반환합니다 (없으면 새로 생성, 끊기면 재연결)."""
     if "db" not in g:
         g.db = pymysql.connect(**_db_config)
+    else:
+        try:
+            g.db.ping(reconnect=True)
+        except Exception:
+            g.db = pymysql.connect(**_db_config)
     return g.db
 
 
