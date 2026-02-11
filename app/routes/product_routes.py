@@ -3,7 +3,7 @@ from io import BytesIO
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from app.routes.dashboard_routes import login_required
 from app.controllers import product_controller, category_controller, supplier_controller
-from app.services.excel_service import generate_product_template
+from app.services.excel_service import generate_product_template, generate_excel_report
 
 product_bp = Blueprint("product", __name__, url_prefix="/products")
 
@@ -88,6 +88,34 @@ def download_template():
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
         download_name="product_upload_template.xlsx",
+    )
+
+
+@product_bp.route("/excel/export")
+@login_required
+def export_excel():
+    """현재 상품 목록을 엑셀로 내보내기"""
+    business_id = session["business"]["id"]
+    products = product_controller.load_products(business_id, active_only=False)
+    headers = ["Code", "Name", "Barcode", "Category", "Supplier",
+               "Unit", "Buy Price", "Sell Price", "Min Stock", "Max Stock",
+               "Storage Location", "Description"]
+    rows = [
+        [p["code"], p["name"], p.get("barcode", ""),
+         p.get("category_name", "") or "", p.get("supplier_name", "") or "",
+         p["unit"], float(p["unit_price"]), float(p["sell_price"]),
+         float(p["min_stock"]), float(p["max_stock"]) if p.get("max_stock") else "",
+         p.get("storage_location", "") or "", p.get("description", "") or ""]
+        for p in products
+    ]
+    output = generate_excel_report("Products", headers, rows,
+                                   column_widths=[14, 25, 18, 18, 18, 10, 14, 14, 12, 12, 20, 30])
+    print(f"📊 엑셀 내보내기 완료 - {len(products)}개 상품")
+    return send_file(
+        output,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name="products_export.xlsx",
     )
 
 

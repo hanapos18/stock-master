@@ -12,8 +12,11 @@
     <button class="btn btn-sm btn-outline-primary">Search</button>
   </form>
   <div class="d-flex gap-2">
+    <a href="{{ url_for('product.export_excel') }}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-file-earmark-arrow-down me-1"></i>Excel Export
+    </a>
     <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#excelUploadModal">
-      <i class="bi bi-file-earmark-excel me-1"></i>Excel Upload
+      <i class="bi bi-file-earmark-arrow-up me-1"></i>Excel Upload
     </button>
     <a href="{{ url_for('product.download_template') }}" class="btn btn-outline-success btn-sm">
       <i class="bi bi-download me-1"></i>Template
