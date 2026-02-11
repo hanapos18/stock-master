@@ -31,7 +31,11 @@ def login():
             print(f"로그인 성공: {username} ({user['business_name']}) - {scope}")
             return redirect(url_for("dashboard.index"))
         flash("Invalid username or password", "danger")
-    has_users = auth_controller.has_any_user()
+    try:
+        has_users = auth_controller.has_any_user()
+    except Exception as e:
+        print(f"❌ DB 연결 실패 (로그인 페이지): {e}")
+        has_users = True
     return render_template("login.html", has_users=has_users)
 
 

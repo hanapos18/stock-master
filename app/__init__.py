@@ -112,6 +112,9 @@ def _register_error_handlers(application: Flask) -> None:
         import traceback
         print(f"❌ 예외 발생 [{request.path}]: {type(error).__name__}: {error}")
         traceback.print_exc()
+        # 로그인 페이지에서 에러 발생 시 리다이렉트 루프 방지
+        if request.path in ("/login", "/setup"):
+            return f"<h2>Server Error</h2><p>{type(error).__name__}: {str(error)[:200]}</p><p>Check DB connection and server logs.</p>", 500
         if "user" in session:
             flash(f"Error: {str(error)[:100]}", "danger")
             referrer = request.referrer
