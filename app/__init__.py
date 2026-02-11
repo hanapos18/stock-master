@@ -83,23 +83,41 @@ def _register_template_filters(application: Flask) -> None:
 
 def _register_error_handlers(application: Flask) -> None:
     """글로벌 에러 핸들러를 등록합니다."""
-    from flask import session, redirect, url_for, flash
-
-    @application.errorhandler(500)
-    def handle_500(error):
-        print(f"❌ 서버 오류 발생: {error}")
-        if "user" in session:
-            flash("A server error occurred. Please try again.", "danger")
-            return redirect(url_for("dashboard.index"))
-        return redirect(url_for("auth.login"))
+    from flask import session, redirect, url_for, flash, request
+    from werkzeug.exceptions import HTTPException
 
     @application.errorhandler(Exception)
     def handle_exception(error):
-        print(f"❌ 예외 발생: {type(error).__name__}: {error}")
+        if isinstance(error, HTTPException):
+            return error
+        import traceback
+        print(f"❌ 예외 발생 [{request.path}]: {type(error).__name__}: {error}")
+        traceback.print_exc()
         if "user" in session:
-            flash(f"Error: {type(error).__name__}", "danger")
+            flash(f"Error: {str(error)[:100]}", "danger")
+            referrer = request.referrer
+            if referrer and "/auth/" not in referrer:
+                return redirect(referrer)
             return redirect(url_for("dashboard.index"))
         return redirect(url_for("auth.login"))
+
+    @application.before_request
+    def ensure_session_store():
+        if "user" not in session:
+            return
+        if "store" not in session and "business" in session:
+            from app.db import fetch_all
+            try:
+                stores = fetch_all(
+                    "SELECT id, name FROM stk_stores WHERE business_id = %s AND is_active = 1",
+                    (session["business"]["id"],),
+                )
+                if stores:
+                    session["store"] = stores[0]
+                    session["stores"] = stores
+                    print(f"🔧 세션에 store 자동 복구: {stores[0]['name']}")
+            except Exception as e:
+                print(f"❌ store 복구 실패: {e}")
 
 
 def _register_context_processors(application: Flask) -> None:
