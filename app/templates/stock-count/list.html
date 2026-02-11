@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Stock Counts{% endblock %}
+{% block page_title %}Stock Count{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <h5>Stock Count Reports</h5>
+  <a href="{{ url_for('stock_count.create_count') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>New Count</a>
+</div>
+<div class="card border-0 shadow-sm"><div class="table-responsive">
+  <table class="table table-hover mb-0"><thead class="table-light"><tr>
+    <th>Date</th><th>Store</th><th>Category</th><th>Items</th><th>Status</th><th>Created By</th><th>Actions</th>
+  </tr></thead><tbody>
+    {% for c in counts %}<tr>
+      <td>{{ c.count_date }}</td><td>{{ c.store_name }}</td><td>{{ c.category_name or 'All' }}</td>
+      <td>{{ c.item_count }}</td>
+      <td><span class="badge bg-{{ 'success' if c.status=='approved' else 'warning' if c.status=='draft' else 'info' }}">{{ c.status }}</span></td>
+      <td>{{ c.created_by_name or '' }}</td>
+      <td>
+        {% if c.status == 'draft' %}<a href="{{ url_for('stock_count.edit_count', count_id=c.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>{% endif %}
+        <a href="{{ url_for('stock_count.view_count', count_id=c.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
+      </td>
+    </tr>{% endfor %}
+    {% if not counts %}<tr><td colspan="7" class="text-center text-muted py-3">No stock counts</td></tr>{% endif %}
+  </tbody></table>
+</div></div>
+{% endblock %}

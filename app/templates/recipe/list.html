@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Recipes - StockMaster{% endblock %}
+{% block page_title %}Recipes{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <h5>Recipe List</h5>
+  <a href="{{ url_for('recipe.create_recipe') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>New Recipe</a>
+</div>
+<div class="card border-0 shadow-sm"><div class="table-responsive">
+  <table class="table table-hover mb-0"><thead class="table-light"><tr>
+    <th>Menu Name</th><th>Yield</th><th>Ingredients</th><th>POS Link</th><th>Actions</th>
+  </tr></thead><tbody>
+    {% for r in recipes %}<tr>
+      <td><strong>{{ r.name }}</strong></td>
+      <td>{{ r.yield_quantity }} {{ r.yield_unit }}</td>
+      <td>{{ r.ingredient_count }}</td>
+      <td>{{ 'Linked' if r.pos_menu_id else 'Manual' }}</td>
+      <td>
+        <a href="{{ url_for('recipe.edit_recipe', recipe_id=r.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+        <button class="btn btn-sm btn-outline-info" onclick="showCost({{ r.id }})">Cost</button>
+        <form method="post" action="{{ url_for('recipe.delete_recipe', recipe_id=r.id) }}" class="d-inline" onsubmit="return confirm('Deactivate?')"><button class="btn btn-sm btn-outline-danger">Delete</button></form>
+      </td>
+    </tr>{% endfor %}
+    {% if not recipes %}<tr><td colspan="5" class="text-center text-muted py-3">No recipes</td></tr>{% endif %}
+  </tbody></table>
+</div></div>
+<div class="modal fade" id="costModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Recipe Cost</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body" id="costBody">Loading...</div>
+</div></div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+function showCost(id){
+  document.getElementById('costBody').innerHTML='Loading...';
+  new bootstrap.Modal(document.getElementById('costModal')).show();
+  fetch('/recipes/'+id+'/cost').then(r=>r.json()).then(d=>{
+    let html='<table class="table table-sm"><thead><tr><th>Ingredient</th><th>Qty</th><th>Cost</th></tr></thead><tbody>';
+    d.items.forEach(i=>{html+='<tr><td>'+i.product_name+'</td><td>'+i.quantity+' '+(i.unit||'')+'</td><td>'+i.cost.toFixed(2)+'</td></tr>';});
+    html+='</tbody><tfoot><tr class="fw-bold"><td colspan="2">Total Cost</td><td>'+d.total_cost.toFixed(2)+'</td></tr></tfoot></table>';
+    document.getElementById('costBody').innerHTML=html;
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Purchase {{ purchase.purchase_number }}{% endblock %}
+{% block page_title %}Purchase {{ purchase.purchase_number }}{% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <div class="row mb-3">
+      <div class="col-md-3"><strong>Date:</strong> {{ purchase.purchase_date }}</div>
+      <div class="col-md-3"><strong>Supplier:</strong> {{ purchase.supplier_name or 'N/A' }}</div>
+      <div class="col-md-3"><strong>Store:</strong> {{ purchase.store_name }}</div>
+      <div class="col-md-3"><strong>Status:</strong> <span class="badge bg-{{ 'success' if purchase.status=='received' else 'warning' if purchase.status=='draft' else 'secondary' }}">{{ purchase.status }}</span></div>
+    </div>
+    {% if purchase.memo %}<p class="text-muted">{{ purchase.memo }}</p>{% endif %}
+    <table class="table table-sm"><thead class="table-light"><tr><th>Code</th><th>Product</th><th>Qty</th><th>Unit</th><th>Price</th><th>Amount</th></tr></thead><tbody>
+      {% for item in purchase.line_items %}<tr>
+        <td><code>{{ item.product_code }}</code></td><td>{{ item.product_name }}</td>
+        <td>{{ item.quantity }}</td><td>{{ item.unit }}</td>
+        <td class="text-end">{{ item.unit_price|fmt_price }}</td><td class="text-end">{{ item.amount|fmt_price }}</td>
+      </tr>{% endfor %}
+      <tr class="fw-bold"><td colspan="5" class="text-end">Total:</td><td class="text-end">{{ purchase.total_amount|fmt_price }}</td></tr>
+    </tbody></table>
+    <!-- Attachments Section -->
+    {% if attachments %}
+    <hr>
+    <h6><i class="bi bi-paperclip me-1"></i>Attachments ({{ attachments|length }})</h6>
+    <div class="row g-3 mb-3">
+      {% for att in attachments %}
+      <div class="col-md-4 col-lg-3">
+        <div class="card border h-100">
+          {% if att.file_type.startswith('image/') %}
+          <a href="{{ url_for('attachment.view_attachment', attachment_id=att.id) }}" target="_blank">
+            <img src="{{ url_for('attachment.view_attachment', attachment_id=att.id) }}"
+                 class="card-img-top" style="max-height:200px;object-fit:contain;background:#f8f9fa;" alt="{{ att.file_name }}">
+          </a>
+          {% else %}
+          <a href="{{ url_for('attachment.view_attachment', attachment_id=att.id) }}" target="_blank"
+             class="d-flex align-items-center justify-content-center bg-light" style="height:120px;">
+            <i class="bi bi-file-earmark-pdf display-3 text-danger"></i>
+          </a>
+          {% endif %}
+          <div class="card-body p-2">
+            <small class="text-muted text-truncate d-block">{{ att.file_name }}</small>
+            <small class="text-muted">{{ (att.file_size / 1024)|round|int }} KB</small>
+            <div class="mt-1">
+              <a href="{{ url_for('attachment.download_attachment', attachment_id=att.id) }}"
+                 class="btn btn-sm btn-outline-success"><i class="bi bi-download"></i></a>
+              <form method="post" action="{{ url_for('attachment.delete_attachment', attachment_id=att.id) }}"
+                    class="d-inline" onsubmit="return confirm('Delete this attachment?');">
+                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <!-- Upload additional attachment -->
+    <form method="post" action="{{ url_for('attachment.upload_to_purchase', purchase_id=purchase.id) }}"
+          enctype="multipart/form-data" class="mb-3">
+      <div class="d-flex align-items-end gap-2">
+        <div>
+          <label class="form-label small mb-1"><i class="bi bi-plus-circle me-1"></i>Add Attachment</label>
+          <input type="file" name="receipt_file" class="form-control form-control-sm"
+                 accept="image/jpeg,image/png,image/webp,application/pdf" required>
+        </div>
+        <button type="submit" class="btn btn-sm btn-primary">Upload</button>
+      </div>
+    </form>
+    <div class="mt-3">
+      {% if purchase.status == 'draft' %}
+      <form method="post" action="{{ url_for('purchase.receive_purchase', purchase_id=purchase.id) }}" class="d-inline">
+        <button class="btn btn-success" onclick="return confirm('Receive and update inventory?')"><i class="bi bi-check-circle me-1"></i>Receive (Update Inventory)</button>
+      </form>
+      <form method="post" action="{{ url_for('purchase.cancel_purchase', purchase_id=purchase.id) }}" class="d-inline ms-2">
+        <button class="btn btn-outline-danger">Cancel</button>
+      </form>
+      {% endif %}
+      <a href="{{ url_for('purchase.list_purchases') }}" class="btn btn-outline-secondary ms-2">Back</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

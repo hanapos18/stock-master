@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if recipe else 'New' }} Recipe{% endblock %}
+{% block page_title %}{{ 'Edit' if recipe else 'New' }} Recipe{% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <form method="post">
+      <div class="row g-3 mb-4">
+        <div class="col-md-5"><label class="form-label">Menu Name *</label><input type="text" name="name" class="form-control" required value="{{ recipe.name if recipe else '' }}"></div>
+        <div class="col-md-3"><label class="form-label">Yield Qty</label><input type="number" name="yield_quantity" class="form-control" step="0.01" value="{{ recipe.yield_quantity if recipe else '1' }}"></div>
+        <div class="col-md-2"><label class="form-label">Unit</label><input type="text" name="yield_unit" class="form-control" value="{{ recipe.yield_unit if recipe else 'ea' }}"></div>
+        <div class="col-md-2">
+          <label class="form-label">POS Menu</label>
+          <select name="pos_menu_id" class="form-select"><option value="">-- None --</option>
+            {% for m in pos_menu %}<option value="{{ m.id }}" {{ 'selected' if recipe and recipe.pos_menu_id == m.id }}>{{ m.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12"><label class="form-label">Description</label><textarea name="description" class="form-control" rows="2">{{ recipe.description if recipe else '' }}</textarea></div>
+      </div>
+      <h6>Ingredients</h6>
+      <div class="mb-3 position-relative" style="max-width:400px;">
+        <input type="text" id="productSearch" class="form-control form-control-sm" placeholder="Search ingredient..." autocomplete="off">
+        <div id="searchResults" class="product-search-results" style="display:none;"></div>
+      </div>
+      <table class="table table-sm"><thead><tr><th>Ingredient</th><th style="width:120px">Qty per Yield</th><th style="width:100px">Unit</th><th style="width:50px"></th></tr></thead>
+        <tbody id="itemsBody">
+          {% if recipe and recipe.ingredients %}{% for i in recipe.ingredients %}<tr>
+            <td><input type="hidden" name="item_product_id[]" value="{{ i.product_id }}">{{ i.product_code }} - {{ i.product_name }}</td>
+            <td><input type="number" name="item_quantity[]" class="form-control form-control-sm" step="0.0001" value="{{ i.quantity }}" required></td>
+            <td><input type="text" name="item_unit[]" class="form-control form-control-sm" value="{{ i.unit or i.product_unit }}"></td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">X</button></td>
+          </tr>{% endfor %}{% endif %}
+        </tbody>
+      </table>
+      <button type="submit" class="btn btn-primary">Save Recipe</button>
+      <a href="{{ url_for('recipe.list_recipes') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+initProductSearch('productSearch', 'searchResults', function(p) {
+  const tbody = document.getElementById('itemsBody');
+  const row = document.createElement('tr');
+  row.innerHTML = '<td><input type="hidden" name="item_product_id[]" value="'+p.id+'">'+p.code+' - '+p.name+'</td>'
+    +'<td><input type="number" name="item_quantity[]" class="form-control form-control-sm" step="0.0001" value="1" required></td>'
+    +'<td><input type="text" name="item_unit[]" class="form-control form-control-sm" value="'+p.unit+'"></td>'
+    +'<td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest(\'tr\').remove()">X</button></td>';
+  tbody.appendChild(row);
+});
+</script>
+{% endblock %}

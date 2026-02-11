@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}New Stock Count{% endblock %}
+{% block page_title %}New Stock Count{% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm" style="max-width:500px;">
+  <div class="card-body">
+    <form method="post">
+      <div class="mb-3"><label class="form-label">Count Date *</label><input type="date" name="count_date" class="form-control" required></div>
+      <div class="mb-3"><label class="form-label">Category (leave empty for all)</label>
+        <select name="category_id" class="form-select"><option value="">All Categories</option>
+          {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+      <div class="mb-3"><label class="form-label">Memo</label><textarea name="memo" class="form-control" rows="2"></textarea></div>
+      <button type="submit" class="btn btn-primary">Create & Load Items</button>
+      <a href="{{ url_for('stock_count.list_counts') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

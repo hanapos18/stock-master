@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Edit Stock Count{% endblock %}
+{% block page_title %}Stock Count - {{ count.count_date }} ({{ count.store_name }}){% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <p>Enter actual quantities for each product:</p>
+    <form method="post">
+      <table class="table table-sm"><thead class="table-light"><tr>
+        <th>Code</th><th>Product</th><th>Unit</th><th>System Qty</th><th>Actual Qty</th><th>Diff</th><th>Memo</th>
+      </tr></thead><tbody>
+        {% for i in count.line_items %}<tr>
+          <td><code>{{ i.product_code }}</code></td><td>{{ i.product_name }}</td><td>{{ i.unit }}</td>
+          <td>{{ i.system_quantity }}</td>
+          <td><input type="number" name="actual_{{ i.id }}" class="form-control form-control-sm" step="0.0001" value="{{ i.actual_quantity }}" style="width:100px"
+              onchange="this.closest('tr').querySelector('.diff').textContent=(parseFloat(this.value)-{{ i.system_quantity|float }}).toFixed(4)"></td>
+          <td class="diff {{ 'text-danger' if (i.actual_quantity|float - i.system_quantity|float) != 0 }}">{{ (i.actual_quantity|float - i.system_quantity|float)|fmt_qty }}</td>
+          <td><input type="text" name="memo_{{ i.id }}" class="form-control form-control-sm" value="{{ i.memo or '' }}" style="width:150px"></td>
+        </tr>{% endfor %}
+      </tbody></table>
+      <button type="submit" class="btn btn-primary">Save</button>
+      <a href="{{ url_for('stock_count.view_count', count_id=count.id) }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Low Stock Report{% endblock %}
+{% block page_title %}Low Stock Alert{% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    {% if data %}
+    <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i><strong>{{ data|length }}</strong> products are at or below minimum stock level</div>
+    {% else %}
+    <div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>All stock levels are OK</div>
+    {% endif %}
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0" id="lowTable"><thead class="table-light"><tr>
+      <th>Code</th><th>Product</th><th>Store</th><th>Unit</th><th>Current Stock</th><th>Min Stock</th><th>Shortage</th>
+    </tr></thead><tbody>
+      {% for r in data %}<tr>
+        <td><code>{{ r.code }}</code></td><td>{{ r.name }}</td><td>{{ r.store_name or '-' }}</td><td>{{ r.unit }}</td>
+        <td class="text-danger fw-bold">{{ r.current_stock }}</td><td>{{ r.min_stock }}</td>
+        <td class="text-danger fw-bold">{{ (r.current_stock|float - r.min_stock|float)|fmt_qty }}</td>
+      </tr>{% endfor %}
+    </tbody></table>
+  </div>
+</div>
+{% if data %}
+<div class="mt-2"><button class="btn btn-sm btn-outline-success" onclick="exportTableToCSV('lowTable','low_stock.csv')"><i class="bi bi-download me-1"></i>CSV</button></div>
+{% endif %}
+{% endblock %}

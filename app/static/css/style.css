@@ -1,0 +1,61 @@
+/* StockMaster Styles */
+.sidebar {
+  width: 240px;
+  min-height: 100vh;
+  transition: width 0.3s;
+  overflow-x: hidden;
+}
+.sidebar.collapsed {
+  width: 0;
+  padding: 0;
+}
+.sidebar .nav-link {
+  padding: 8px 16px;
+  border-radius: 6px;
+  margin: 1px 0;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+.sidebar .nav-link:hover {
+  background: rgba(255,255,255,0.1);
+}
+.sidebar .nav-link.active {
+  background: rgba(13,110,253,0.3);
+}
+.card {
+  border-radius: 10px;
+}
+.table th {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6c757d;
+}
+.badge { font-weight: 500; }
+main { background: #f8f9fa; min-height: 100vh; }
+@media print {
+  .sidebar, nav.navbar, .no-print { display: none !important; }
+  main { padding: 0 !important; }
+  .card { border: none !important; box-shadow: none !important; }
+}
+/* Product search */
+.product-search-results {
+  position: absolute;
+  z-index: 100;
+  max-height: 250px;
+  overflow-y: auto;
+  width: 100%;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+}
+.product-search-results .list-group-item {
+  cursor: pointer;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+}
+.product-search-results .list-group-item:hover {
+  background: #e9ecef;
+}

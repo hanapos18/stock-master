@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Delivery List - {{ sale.sale_number }}</title>
+  <style>
+    @page { size: A4; margin: 15mm; }
+    body { font-family: 'Malgun Gothic', Arial, sans-serif; font-size: 12pt; }
+    .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+    .info-table { width: 100%; margin-bottom: 15px; }
+    .info-table td { padding: 3px 8px; }
+    .items-table { width: 100%; border-collapse: collapse; }
+    .items-table th, .items-table td { border: 1px solid #333; padding: 6px 8px; }
+    .items-table th { background: #f0f0f0; text-align: center; }
+    .text-right { text-align: right; }
+    .total-row { font-weight: bold; font-size: 14pt; }
+    .footer { margin-top: 40px; display: flex; justify-content: space-between; }
+    .sign-box { border-top: 1px solid #333; width: 200px; text-align: center; padding-top: 5px; }
+    @media print { .no-print { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="text-align:center;margin-bottom:10px;">
+    <button onclick="window.print()" style="padding:8px 24px;font-size:14pt;">Print</button>
+  </div>
+  <div class="header"><h2>DELIVERY LIST</h2><p>{{ sale.sale_number }}</p></div>
+  <table class="info-table">
+    <tr><td><strong>Customer:</strong> {{ sale.customer_name or '-' }}</td><td><strong>Date:</strong> {{ sale.sale_date }}</td></tr>
+    <tr><td><strong>Store:</strong> {{ sale.store_name }}</td><td></td></tr>
+  </table>
+  <table class="items-table"><thead><tr><th>#</th><th>Code</th><th>Product</th><th>Qty</th><th>Unit</th><th>Price</th><th>Amount</th></tr></thead><tbody>
+    {% for i in sale.line_items %}<tr>
+      <td style="text-align:center">{{ loop.index }}</td><td>{{ i.product_code }}</td><td>{{ i.product_name }}</td>
+      <td class="text-right">{{ i.quantity }}</td><td>{{ i.unit }}</td>
+      <td class="text-right">{{ i.unit_price|fmt_price }}</td><td class="text-right">{{ i.amount|fmt_price }}</td>
+    </tr>{% endfor %}
+    <tr class="total-row"><td colspan="5"></td><td class="text-right">Total:</td><td class="text-right">{{ sale.total_amount|fmt_price }}</td></tr>
+  </tbody></table>
+  {% if sale.memo %}<p style="margin-top:15px"><strong>Note:</strong> {{ sale.memo }}</p>{% endif %}
+  <div class="footer"><div class="sign-box">Prepared By</div><div class="sign-box">Received By</div></div>
+</body>
+</html>

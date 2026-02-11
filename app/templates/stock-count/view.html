@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Stock Count Detail{% endblock %}
+{% block page_title %}Stock Count - {{ count.count_date }}{% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <div class="row mb-3">
+      <div class="col-md-3"><strong>Date:</strong> {{ count.count_date }}</div>
+      <div class="col-md-3"><strong>Store:</strong> {{ count.store_name }}</div>
+      <div class="col-md-3"><strong>Category:</strong> {{ count.category_name or 'All' }}</div>
+      <div class="col-md-3"><strong>Status:</strong> <span class="badge bg-{{ 'success' if count.status=='approved' else 'warning' }}">{{ count.status }}</span></div>
+    </div>
+    <table class="table table-sm" id="countTable"><thead class="table-light"><tr>
+      <th>Code</th><th>Product</th><th>Unit</th><th>System</th><th>Actual</th><th>Diff</th><th>Memo</th>
+    </tr></thead><tbody>
+      {% for i in count.line_items %}
+      {% set diff = i.actual_quantity|float - i.system_quantity|float %}
+      <tr class="{{ 'table-danger' if diff < 0 else 'table-success' if diff > 0 else '' }}">
+        <td><code>{{ i.product_code }}</code></td><td>{{ i.product_name }}</td><td>{{ i.unit }}</td>
+        <td>{{ i.system_quantity }}</td><td class="fw-bold">{{ i.actual_quantity }}</td>
+        <td class="fw-bold">{{ diff|fmt_qty }}</td><td class="small">{{ i.memo or '' }}</td>
+      </tr>{% endfor %}
+    </tbody></table>
+    <div class="mt-3">
+      {% if count.status != 'approved' %}
+      <form method="post" action="{{ url_for('stock_count.approve_count', count_id=count.id) }}" class="d-inline">
+        <button class="btn btn-success" onclick="return confirm('Approve and adjust inventory?')"><i class="bi bi-check-circle me-1"></i>Approve (Adjust Inventory)</button>
+      </form>
+      <a href="{{ url_for('stock_count.edit_count', count_id=count.id) }}" class="btn btn-outline-primary ms-2">Edit</a>{% endif %}
+      <button class="btn btn-outline-success ms-2" onclick="exportTableToCSV('countTable','stock_count_{{ count.count_date }}.csv')"><i class="bi bi-download me-1"></i>CSV</button>
+      <a href="{{ url_for('stock_count.list_counts') }}" class="btn btn-outline-secondary ms-2">Back</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

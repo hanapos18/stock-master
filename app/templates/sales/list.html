@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Sales - StockMaster{% endblock %}
+{% block page_title %}Sales{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('sales.list_sales') }}" class="btn btn-sm {{ 'btn-primary' if not selected_status else 'btn-outline-primary' }}">All</a>
+    {% for s in ['draft','confirmed','cancelled'] %}
+    <a href="{{ url_for('sales.list_sales', status=s) }}" class="btn btn-sm {{ 'btn-primary' if selected_status==s else 'btn-outline-primary' }}">{{ s|capitalize }}</a>{% endfor %}
+  </div>
+  <a href="{{ url_for('sales.create_sale') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>New Sale</a>
+</div>
+<div class="card border-0 shadow-sm"><div class="table-responsive">
+  <table class="table table-hover mb-0"><thead class="table-light"><tr>
+    <th>Number</th><th>Date</th><th>Customer</th><th>Store</th><th>Amount</th><th>Status</th><th>Actions</th>
+  </tr></thead><tbody>
+    {% for sa in sales %}<tr>
+      <td><a href="{{ url_for('sales.view_sale', sale_id=sa.id) }}">{{ sa.sale_number }}</a></td>
+      <td>{{ sa.sale_date }}</td><td>{{ sa.customer_name or '-' }}</td><td>{{ sa.store_name }}</td>
+      <td class="text-end fw-bold">{{ sa.total_amount|fmt_price }}</td>
+      <td><span class="badge bg-{{ 'success' if sa.status=='confirmed' else 'warning' if sa.status=='draft' else 'secondary' }}">{{ sa.status }}</span></td>
+      <td><a href="{{ url_for('sales.view_sale', sale_id=sa.id) }}" class="btn btn-sm btn-outline-primary">View</a></td>
+    </tr>{% endfor %}
+    {% if not sales %}<tr><td colspan="7" class="text-center text-muted py-3">No sales</td></tr>{% endif %}
+  </tbody></table>
+</div></div>
+{% endblock %}

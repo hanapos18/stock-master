@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Categories - StockMaster{% endblock %}
+{% block page_title %}Categories{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light"><tr><th>Name</th><th>Parent</th><th>Products</th><th>Order</th><th>Actions</th></tr></thead>
+          <tbody>
+            {% for c in categories %}
+            <tr>
+              <td><strong>{{ c.name }}</strong></td>
+              <td>{{ c.parent_name or '-' }}</td>
+              <td>{{ c.product_count }}</td>
+              <td>{{ c.display_order }}</td>
+              <td>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCat{{ c.id }}">Edit</button>
+                <form method="post" action="{{ url_for('category.delete_category', category_id=c.id) }}" class="d-inline" onsubmit="return confirm('Delete?')">
+                  <button class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+            <div class="modal fade" id="editCat{{ c.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+              <form method="post" action="{{ url_for('category.edit_category', category_id=c.id) }}">
+              <div class="modal-header"><h5 class="modal-title">Edit Category</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+              <div class="modal-body">
+                <div class="mb-3"><label class="form-label">Name *</label><input type="text" name="name" class="form-control" value="{{ c.name }}" required></div>
+                <div class="mb-3"><label class="form-label">Parent</label>
+                  <select name="parent_id" class="form-select"><option value="">-- None --</option>
+                    {% for p in categories %}{% if p.id != c.id %}<option value="{{ p.id }}" {{ 'selected' if c.parent_id == p.id }}>{{ p.name }}</option>{% endif %}{% endfor %}
+                  </select>
+                </div>
+                <div class="mb-3"><label class="form-label">Display Order</label><input type="number" name="display_order" class="form-control" value="{{ c.display_order }}"></div>
+              </div>
+              <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+              </form>
+            </div></div></div>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white"><h6 class="mb-0">Add Category</h6></div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('category.create_category') }}">
+          <div class="mb-3"><label class="form-label">Name *</label><input type="text" name="name" class="form-control" required></div>
+          <div class="mb-3"><label class="form-label">Parent</label>
+            <select name="parent_id" class="form-select"><option value="">-- None --</option>
+              {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="mb-3"><label class="form-label">Display Order</label><input type="number" name="display_order" class="form-control" value="0"></div>
+          <button type="submit" class="btn btn-primary w-100">Add</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

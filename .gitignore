@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.env
+*.spec
+.venv/
+venv/
+node_modules/
+*.exe
+nohup.out

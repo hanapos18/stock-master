@@ -1,0 +1,600 @@
+{% extends "base.html" %}
+{% block title %}User Manual - StockMaster{% endblock %}
+{% block page_title %}Help / User Manual{% endblock %}
+{% block head %}
+<style>
+  .help-sidebar { position: sticky; top: 0; max-height: calc(100vh - 120px); overflow-y: auto; }
+  .help-sidebar .nav-link { padding: 6px 12px; font-size: 0.88rem; color: #555; border-radius: 4px; }
+  .help-sidebar .nav-link:hover, .help-sidebar .nav-link.active { background: #e9ecef; color: #0d6efd; }
+  .help-sidebar .section-header { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #999; padding: 10px 12px 4px; }
+  .help-section { scroll-margin-top: 20px; }
+  .help-section h3 { color: #333; border-bottom: 2px solid #4472C4; padding-bottom: 8px; }
+  .help-section h4 { color: #4472C4; margin-top: 18px; }
+  .step-list { counter-reset: step; list-style: none; padding-left: 0; }
+  .step-list li { counter-increment: step; padding: 8px 0 8px 40px; position: relative; border-left: 2px solid #dee2e6; margin-left: 15px; }
+  .step-list li::before { content: counter(step); position: absolute; left: -16px; top: 6px; width: 30px; height: 30px; background: #4472C4; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: bold; }
+  .tip-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px 14px; border-radius: 4px; margin: 10px 0; font-size: 0.9rem; }
+  .warn-box { background: #f8d7da; border-left: 4px solid #dc3545; padding: 10px 14px; border-radius: 4px; margin: 10px 0; font-size: 0.9rem; }
+  .info-box { background: #cff4fc; border-left: 4px solid #0dcaf0; padding: 10px 14px; border-radius: 4px; margin: 10px 0; font-size: 0.9rem; }
+  .key-badge { display: inline-block; background: #e9ecef; border: 1px solid #ced4da; border-radius: 3px; padding: 1px 6px; font-size: 0.82rem; font-family: monospace; }
+  .menu-path { font-weight: bold; color: #4472C4; }
+  table.help-table { font-size: 0.9rem; }
+  table.help-table th { background: #f8f9fa; }
+  @media print { .help-sidebar, .sidebar, .navbar, .no-print { display:none!important; } main { padding:0!important; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="row">
+  <!-- Left Nav -->
+  <div class="col-lg-3 col-xl-2 no-print">
+    <div class="card border-0 shadow-sm help-sidebar">
+      <div class="card-body py-2 px-0">
+        <div class="section-header">Getting Started</div>
+        <nav class="nav flex-column">
+          <a class="nav-link" href="#overview">Overview</a>
+          <a class="nav-link" href="#login">Login / Setup</a>
+        </nav>
+        <div class="section-header">Common Menus</div>
+        <nav class="nav flex-column">
+          <a class="nav-link" href="#dashboard">Dashboard</a>
+          <a class="nav-link" href="#products">Products</a>
+          <a class="nav-link" href="#categories">Categories</a>
+          <a class="nav-link" href="#suppliers">Suppliers</a>
+          <a class="nav-link" href="#inventory">Inventory</a>
+          <a class="nav-link" href="#purchases">Purchases</a>
+          <a class="nav-link" href="#stock-count">Stock Count</a>
+        </nav>
+        <div class="section-header">Restaurant</div>
+        <nav class="nav flex-column">
+          <a class="nav-link" href="#recipes">Recipes</a>
+        </nav>
+        <div class="section-header">Mart</div>
+        <nav class="nav flex-column">
+          <a class="nav-link" href="#repackaging">Repackaging</a>
+          <a class="nav-link" href="#wholesale-clients">Wholesale Clients</a>
+          <a class="nav-link" href="#wholesale-orders">Wholesale Orders</a>
+        </nav>
+        <div class="section-header">Non-POS</div>
+        <nav class="nav flex-column">
+          <a class="nav-link" href="#sales">Sales</a>
+        </nav>
+        <div class="section-header">Reports & Admin</div>
+        <nav class="nav flex-column">
+          <a class="nav-link" href="#reports">Reports</a>
+          <a class="nav-link" href="#businesses">Businesses</a>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="col-lg-9 col-xl-10">
+    <div class="mb-3 no-print">
+      <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print Manual</button>
+    </div>
+
+    <!-- ========== OVERVIEW ========== -->
+    <section id="overview" class="help-section mb-5">
+      <h3><i class="bi bi-info-circle me-2"></i>Overview</h3>
+      <p>StockMaster는 식당 및 마트/리테일 사업자를 위한 <strong>통합 재고 관리 시스템</strong>입니다.</p>
+      <div class="row g-3 mt-2">
+        <div class="col-md-4">
+          <div class="card border-primary h-100"><div class="card-body">
+            <h6 class="card-title text-primary"><i class="bi bi-people"></i> 공통 기능</h6>
+            <ul class="small mb-0">
+              <li>상품/카테고리/거래처 관리</li>
+              <li>재고 입출고/조정/폐기</li>
+              <li>매입 관리</li>
+              <li>실사 재고 보고</li>
+              <li>리포트 (엑셀 내보내기)</li>
+            </ul>
+          </div></div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-info h-100"><div class="card-body">
+            <h6 class="card-title text-info"><i class="bi bi-egg-fried"></i> 식당 전용</h6>
+            <ul class="small mb-0">
+              <li>레시피 관리 (메뉴별 원재료)</li>
+              <li>POS 판매 → 자동 재고 차감</li>
+              <li>원가율 분석</li>
+              <li>일일 실사 보고</li>
+            </ul>
+          </div></div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-success h-100"><div class="card-body">
+            <h6 class="card-title text-success"><i class="bi bi-shop"></i> 마트 전용</h6>
+            <ul class="small mb-0">
+              <li>도매 거래처 관리</li>
+              <li>업체별 할인가 설정</li>
+              <li>도매 주문 / 배송리스트 A4</li>
+              <li>자체 판매 기능 (비POS)</li>
+            </ul>
+          </div></div>
+        </div>
+      </div>
+      <div class="info-box mt-3"><strong>POS 연동:</strong> HANAPOS와 동일 MariaDB 서버를 사용하며, POS DB에서 메뉴/매출 데이터를 직접 조회할 수 있습니다.</div>
+    </section>
+
+    <!-- ========== LOGIN ========== -->
+    <section id="login" class="help-section mb-5">
+      <h3><i class="bi bi-box-arrow-in-right me-2"></i>Login / Setup</h3>
+      <h4>첫 로그인</h4>
+      <p>기본 관리자 계정으로 로그인합니다.</p>
+      <table class="table table-bordered table-sm help-table" style="max-width:400px">
+        <tr><th>Username</th><td><span class="key-badge">admin</span></td></tr>
+        <tr><th>Password</th><td><span class="key-badge">admin123</span></td></tr>
+      </table>
+      <div class="warn-box"><strong>주의:</strong> 운영 환경에서는 반드시 비밀번호를 변경하세요.</div>
+
+      <h4>초기 설정 (첫 사용 시)</h4>
+      <p>사용자가 없는 경우 로그인 화면에 <strong>Initial Setup</strong> 폼이 표시됩니다.</p>
+      <ol class="step-list">
+        <li>Business Name에 사업장 이름을 입력합니다 (예: 메이플 레스토랑)</li>
+        <li>Business Type을 선택합니다 (<strong>Restaurant</strong> 또는 <strong>Mart</strong>)</li>
+        <li>관리자 Username과 Password를 설정합니다</li>
+        <li><span class="key-badge">Setup</span> 버튼을 클릭하면 사업장, 기본 매장, 관리자 계정이 생성됩니다</li>
+      </ol>
+
+      <h4>매장 전환</h4>
+      <p>상단 네비게이션의 <span class="menu-path"><i class="bi bi-shop"></i> Store Name</span> 드롭다운에서 다른 매장으로 전환할 수 있습니다. 여러 매장이 등록된 경우에만 표시됩니다.</p>
+    </section>
+
+    <!-- ========== DASHBOARD ========== -->
+    <section id="dashboard" class="help-section mb-5">
+      <h3><i class="bi bi-speedometer2 me-2"></i>Dashboard</h3>
+      <p>로그인 후 가장 먼저 보이는 메인 화면입니다.</p>
+      <table class="table table-bordered table-sm help-table">
+        <thead><tr><th style="width:200px">섹션</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Summary Cards</strong></td><td>전체 상품 수, 총 재고 수량, 재고 부족 항목 수를 한눈에 표시</td></tr>
+          <tr><td><strong>Recent Transactions</strong></td><td>최근 10개의 입출고/조정 내역을 시간순으로 표시</td></tr>
+          <tr><td><strong>Low Stock Alerts</strong></td><td>최소 재고량(min_stock) 이하인 상품을 경고로 표시</td></tr>
+          <tr><td><strong>Quick Actions</strong></td><td>자주 사용하는 기능 (입고, 출고, 매입 생성 등)으로 바로 이동</td></tr>
+        </tbody>
+      </table>
+      <div class="tip-box"><strong>TIP:</strong> Low Stock 경고가 뜨면 Purchases 메뉴에서 매입을 생성하여 재고를 보충하세요.</div>
+    </section>
+
+    <!-- ========== PRODUCTS ========== -->
+    <section id="products" class="help-section mb-5">
+      <h3><i class="bi bi-tag me-2"></i>Products</h3>
+      <p>상품 및 식자재를 등록·관리합니다. 모든 재고/매입/판매의 기본 단위입니다.</p>
+      <p><span class="menu-path">Sidebar → Products</span></p>
+
+      <h4>상품 목록 조회</h4>
+      <ul>
+        <li><strong>Search:</strong> 상품명 또는 코드로 검색</li>
+        <li><strong>Category Filter:</strong> 카테고리별 필터링</li>
+      </ul>
+
+      <h4>상품 생성</h4>
+      <ol class="step-list">
+        <li><span class="key-badge">New Product</span> 버튼 클릭</li>
+        <li><strong>Code</strong>: 자동 생성됨 (P0001, P0002...) — 직접 수정 가능</li>
+        <li><strong>Name</strong>: 상품명 입력 (필수)</li>
+        <li><strong>Category / Supplier</strong>: 드롭다운에서 선택 (선택사항)</li>
+        <li><strong>Unit</strong>: 단위 선택 (ea, kg, g, L, mL, box, pack 등)</li>
+        <li><strong>Buy Price</strong>: 매입 단가 (원가 계산에 사용)</li>
+        <li><strong>Sell Price</strong>: 판매 단가</li>
+        <li><strong>Min Stock</strong>: 최소 재고량 — 이 이하로 떨어지면 Low Stock 경고 발생</li>
+        <li><span class="key-badge">Save</span> 클릭</li>
+      </ol>
+
+      <h4>상품 수정 / 삭제</h4>
+      <ul>
+        <li><strong>Edit</strong>: 상품 정보를 수정합니다</li>
+        <li><strong>Delete</strong>: 상품을 비활성화합니다 (데이터는 보존, 목록에서 숨김)</li>
+      </ul>
+
+      <h4>상품 검색 API</h4>
+      <p>다른 화면(입고, 매입, 레시피 등)에서 상품 검색 시, 상품명/코드를 2글자 이상 입력하면 자동완성이 작동합니다.</p>
+    </section>
+
+    <!-- ========== CATEGORIES ========== -->
+    <section id="categories" class="help-section mb-5">
+      <h3><i class="bi bi-folder me-2"></i>Categories</h3>
+      <p>상품을 분류하는 카테고리를 관리합니다. 계층 구조(부모-자식)를 지원합니다.</p>
+      <p><span class="menu-path">Sidebar → Categories</span></p>
+
+      <h4>카테고리 추가</h4>
+      <ol class="step-list">
+        <li>오른쪽 <strong>Add Category</strong> 카드에서 이름을 입력</li>
+        <li>Parent 카테고리를 선택하면 하위 카테고리로 등록됩니다 (선택사항)</li>
+        <li>Display Order: 정렬 순서 (숫자가 작을수록 먼저 표시)</li>
+        <li><span class="key-badge">Add</span> 클릭</li>
+      </ol>
+
+      <h4>카테고리 수정 / 삭제</h4>
+      <ul>
+        <li><strong>Edit</strong>: 모달 팝업에서 이름, 부모, 정렬 순서를 수정</li>
+        <li><strong>Delete</strong>: 카테고리를 삭제합니다 — 해당 카테고리에 속한 상품은 "미분류"로 변경됩니다</li>
+      </ul>
+    </section>
+
+    <!-- ========== SUPPLIERS ========== -->
+    <section id="suppliers" class="help-section mb-5">
+      <h3><i class="bi bi-truck me-2"></i>Suppliers</h3>
+      <p>거래처(납품업체)를 관리합니다. 매입 시 거래처를 지정할 수 있습니다.</p>
+      <p><span class="menu-path">Sidebar → Suppliers</span></p>
+
+      <h4>거래처 등록</h4>
+      <ol class="step-list">
+        <li><span class="key-badge">New Supplier</span> 클릭</li>
+        <li>이름, 담당자, 전화번호, 이메일, 주소, 메모를 입력</li>
+        <li><span class="key-badge">Save</span> 클릭</li>
+      </ol>
+      <p><strong>Delete</strong>는 비활성화 처리이며, 기존 매입 기록은 유지됩니다.</p>
+    </section>
+
+    <!-- ========== INVENTORY ========== -->
+    <section id="inventory" class="help-section mb-5">
+      <h3><i class="bi bi-boxes me-2"></i>Inventory</h3>
+      <p><strong>현재 매장의 재고 현황</strong>을 조회하고, 입고/출고/조정/폐기를 처리합니다.</p>
+      <p><span class="menu-path">Sidebar → Inventory</span></p>
+      <div class="info-box">재고는 <strong>매장(Store) + 위치(Location)</strong> 단위로 관리됩니다. 먼저 매장을 선택해야 합니다.</div>
+
+      <h4>위치(Location) 종류</h4>
+      <table class="table table-bordered table-sm help-table">
+        <thead><tr><th>코드</th><th>설명</th><th>용도</th></tr></thead>
+        <tbody>
+          <tr><td><span class="key-badge">warehouse</span></td><td>Warehouse</td><td>일반 창고</td></tr>
+          <tr><td><span class="key-badge">cold_storage</span></td><td>Cold Storage</td><td>냉장 보관</td></tr>
+          <tr><td><span class="key-badge">freezer</span></td><td>Freezer</td><td>냉동 보관</td></tr>
+          <tr><td><span class="key-badge">dry_storage</span></td><td>Dry Storage</td><td>건조 보관 (양념, 쌀 등)</td></tr>
+          <tr><td><span class="key-badge">kitchen</span></td><td>Kitchen</td><td>주방 (식당용)</td></tr>
+          <tr><td><span class="key-badge">display</span></td><td>Display</td><td>진열대 (마트용)</td></tr>
+          <tr><td><span class="key-badge">backroom</span></td><td>Backroom</td><td>뒷방 보관</td></tr>
+        </tbody>
+      </table>
+
+      <h4><i class="bi bi-plus-circle text-success"></i> Stock In (입고)</h4>
+      <ol class="step-list">
+        <li><span class="key-badge">Stock In</span> 버튼 클릭</li>
+        <li>상품 검색창에 이름/코드 입력 → 자동완성에서 선택</li>
+        <li>수량, 위치, 단가, 사유를 입력</li>
+        <li><span class="key-badge">Process Stock In</span> 클릭 → 재고 증가 + 트랜잭션 기록</li>
+      </ol>
+
+      <h4><i class="bi bi-dash-circle text-danger"></i> Stock Out (출고)</h4>
+      <ol class="step-list">
+        <li><span class="key-badge">Stock Out</span> 버튼 클릭</li>
+        <li>상품 선택 후 수량, 위치, 사유 입력</li>
+        <li><span class="key-badge">Process Stock Out</span> 클릭 → 재고 감소 + 트랜잭션 기록</li>
+      </ol>
+
+      <h4><i class="bi bi-arrow-left-right text-warning"></i> Adjust (재고 조정)</h4>
+      <p>재고 목록에서 특정 상품의 <span class="key-badge">Adjust</span> 버튼을 클릭하면 현재 수량을 새로운 수량으로 직접 변경할 수 있습니다. 실사 후 수량 보정에 사용합니다.</p>
+
+      <h4><i class="bi bi-trash text-danger"></i> Discard (폐기)</h4>
+      <p>유통기한 만료, 파손 등으로 사용할 수 없는 상품을 폐기 처리합니다. 폐기 사유를 기록할 수 있습니다.</p>
+
+      <h4><i class="bi bi-arrow-repeat text-info"></i> History (입출고 내역)</h4>
+      <p><span class="key-badge">History</span> 버튼으로 모든 트랜잭션 내역을 조회합니다. 유형별(IN, OUT, ADJUST, DISCARD, MOVE, SALE) 필터링이 가능하며, CSV 내보내기를 지원합니다.</p>
+
+      <h4>Low Stock 필터</h4>
+      <p><span class="key-badge">Low Stock</span> 토글을 활성화하면 최소 재고량 이하인 상품만 표시됩니다. 빨간색 행으로 강조됩니다.</p>
+    </section>
+
+    <!-- ========== PURCHASES ========== -->
+    <section id="purchases" class="help-section mb-5">
+      <h3><i class="bi bi-cart-plus me-2"></i>Purchases</h3>
+      <p>매입(발주)을 관리합니다. 매입 입고 시 자동으로 재고가 증가합니다.</p>
+      <p><span class="menu-path">Sidebar → Purchases</span></p>
+
+      <h4>매입 프로세스</h4>
+      <div class="d-flex align-items-center gap-2 my-3">
+        <span class="badge bg-warning">Draft</span> <i class="bi bi-arrow-right"></i>
+        <span class="badge bg-success">Received</span> (재고 자동 반영)
+        <span class="mx-2">또는</span>
+        <span class="badge bg-secondary">Cancelled</span>
+      </div>
+
+      <h4>매입 생성</h4>
+      <ol class="step-list">
+        <li><span class="key-badge">New Purchase</span> 클릭</li>
+        <li>매입 날짜, 거래처 선택, 메모 입력</li>
+        <li>상품 검색 → 자동완성에서 선택하면 항목이 추가됨</li>
+        <li>각 항목의 수량과 단가를 입력 (합계 자동 계산)</li>
+        <li><span class="key-badge">Create Purchase</span> 클릭 → Draft 상태로 생성</li>
+      </ol>
+
+      <h4>매입 입고</h4>
+      <ol class="step-list">
+        <li>매입 상세 화면에서 <span class="key-badge">Receive (Update Inventory)</span> 클릭</li>
+        <li>확인 팝업에서 OK → 모든 항목이 자동으로 재고에 입고 처리됩니다</li>
+        <li>상태가 <span class="badge bg-success">Received</span>로 변경됩니다</li>
+      </ol>
+      <div class="warn-box"><strong>주의:</strong> 입고 처리 후에는 취소할 수 없습니다. 오류 시 재고 조정(Adjust)으로 보정하세요.</div>
+    </section>
+
+    <!-- ========== STOCK COUNT ========== -->
+    <section id="stock-count" class="help-section mb-5">
+      <h3><i class="bi bi-clipboard-check me-2"></i>Stock Count (실사 재고 보고)</h3>
+      <p>실제 재고를 확인하고 시스템 재고와 비교하는 <strong>재고 실사</strong> 기능입니다.</p>
+      <p><span class="menu-path">Sidebar → Stock Count</span></p>
+
+      <h4>실사 프로세스</h4>
+      <div class="d-flex align-items-center gap-2 my-3">
+        <span class="badge bg-warning">Draft</span> (수량 입력) <i class="bi bi-arrow-right"></i>
+        <span class="badge bg-success">Approved</span> (재고 자동 조정)
+      </div>
+
+      <h4>실사 생성 및 진행</h4>
+      <ol class="step-list">
+        <li><span class="key-badge">New Count</span> 클릭</li>
+        <li>날짜 선택, 카테고리 필터 (비워두면 전체 상품)</li>
+        <li><span class="key-badge">Create & Load Items</span> → 시스템 재고가 자동 로드됩니다</li>
+        <li>각 상품의 <strong>Actual Qty</strong> (실제 수량) 컬럼에 현장 확인 수량을 입력</li>
+        <li>차이(Diff)가 자동 계산됩니다 (빨간색 = 부족, 초록색 = 초과)</li>
+        <li><span class="key-badge">Save</span>로 저장 후, 확인 완료되면 <span class="key-badge">Approve</span> 클릭</li>
+        <li>승인 시 시스템 재고가 <strong>실제 수량으로 자동 조정</strong>됩니다</li>
+      </ol>
+      <div class="tip-box"><strong>TIP (마트):</strong> 전체 실사가 어려운 경우, 카테고리별로 나누어 실사할 수 있습니다.</div>
+      <div class="tip-box"><strong>TIP (식당):</strong> 매일 영업 종료 후 주요 식자재의 실사를 진행하면 원가 관리에 도움이 됩니다.</div>
+    </section>
+
+    <!-- ========== RECIPES ========== -->
+    <section id="recipes" class="help-section mb-5">
+      <h3><i class="bi bi-journal-text me-2"></i>Recipes <span class="badge bg-info">Restaurant</span></h3>
+      <p>메뉴별 원재료(레시피)를 등록하고, 판매 시 자동으로 재고를 차감합니다.</p>
+      <p><span class="menu-path">Sidebar → Recipes</span> (사업장 타입이 Restaurant인 경우만 표시)</p>
+
+      <h4>레시피 등록</h4>
+      <ol class="step-list">
+        <li><span class="key-badge">New Recipe</span> 클릭</li>
+        <li><strong>Menu Name</strong>: 메뉴 이름 입력 (예: SAM GYUBSAL 1인분)</li>
+        <li><strong>Yield Qty / Unit</strong>: 1회 완성 수량 (기본: 1 serving)</li>
+        <li><strong>POS Menu</strong>: POS 연동 시 해당 메뉴 아이템을 선택 (자동 차감 연결용)</li>
+        <li>상품 검색으로 원재료를 추가:
+          <ul>
+            <li><strong>Qty per Yield</strong>: 1인분(1 yield) 당 소요량</li>
+            <li><strong>Unit</strong>: 해당 원재료의 단위</li>
+          </ul>
+        </li>
+        <li><span class="key-badge">Save Recipe</span> 클릭</li>
+      </ol>
+
+      <h4>원가 계산</h4>
+      <p>레시피 목록에서 <span class="key-badge">Cost</span> 버튼을 클릭하면 각 원재료의 단가 × 사용량으로 <strong>1인분 원가</strong>가 계산됩니다.</p>
+
+      <h4>레시피 기반 재고 차감</h4>
+      <p>POS에서 메뉴가 판매될 때, 해당 레시피의 원재료가 소요량만큼 자동으로 재고에서 차감됩니다.</p>
+      <div class="info-box">
+        <strong>예시:</strong> SAM GYUBSAL 3인분 판매 시<br>
+        삼겹살 0.3kg × 3 = 0.9kg, 대파 0.05kg × 3 = 0.15kg ... 자동 차감
+      </div>
+    </section>
+
+    <!-- ========== REPACKAGING ========== -->
+    <section id="repackaging" class="help-section mb-5">
+      <h3><i class="bi bi-scissors me-2"></i>Repackaging <span class="badge bg-success">Mart</span></h3>
+      <p>대량 상품을 소포장으로 소분(리패키징)하는 규칙을 관리하고 실행합니다.</p>
+      <p><span class="menu-path">Sidebar → Repackaging</span> (Mart 타입만 표시)</p>
+
+      <h4>소분 규칙 등록</h4>
+      <ol class="step-list">
+        <li><span class="key-badge">New Rule</span> 클릭</li>
+        <li><strong>Source Product</strong>: 대량 원재료 선택 (예: 쌀 10kg)</li>
+        <li><strong>Target Product</strong>: 소분 상품 선택 (예: 쌀 500g 팩)</li>
+        <li><strong>Ratio</strong>: 변환 비율 입력 (예: 20 → 1개 소스에서 20개 타겟 생산)</li>
+        <li><span class="key-badge">Save Rule</span> 클릭</li>
+      </ol>
+
+      <h4>소분 실행</h4>
+      <ol class="step-list">
+        <li>규칙 목록에서 <span class="key-badge">Execute</span> 버튼 클릭</li>
+        <li>소분할 원재료 수량 입력 → 생산될 타겟 수량이 자동 계산됩니다</li>
+        <li><span class="key-badge">Execute Repackaging</span> 클릭</li>
+        <li>원재료가 재고에서 차감되고, 소분 상품이 재고에 추가됩니다</li>
+      </ol>
+      <div class="info-box">
+        <strong>예시:</strong> 쌀 10kg 1봉 → 쌀 500g × 20팩<br>
+        Source Qty: 1, Ratio: 20 → Target Qty: 20
+      </div>
+    </section>
+
+    <!-- ========== WHOLESALE CLIENTS ========== -->
+    <section id="wholesale-clients" class="help-section mb-5">
+      <h3><i class="bi bi-people me-2"></i>Wholesale Clients <span class="badge bg-success">Mart</span></h3>
+      <p>도매 거래처를 관리하고, 업체별 할인 가격을 설정합니다.</p>
+      <p><span class="menu-path">Sidebar → Wholesale Clients</span> (Mart 타입만 표시)</p>
+
+      <h4>거래처 등록</h4>
+      <ol class="step-list">
+        <li><span class="key-badge">New Client</span> 클릭</li>
+        <li>업체명, 담당자, 전화번호, 이메일, 주소 입력</li>
+        <li><strong>Default Disc %</strong>: 기본 할인율 (예: 10이면 전 상품 10% 할인)</li>
+        <li><span class="key-badge">Save</span> 클릭</li>
+      </ol>
+
+      <h4>업체별 할인가 설정</h4>
+      <p>거래처 수정 화면 오른쪽의 <strong>Product Pricing</strong> 섹션에서:</p>
+      <ol class="step-list">
+        <li>상품 검색으로 할인 대상 상품을 선택</li>
+        <li>할인 유형 선택:
+          <ul>
+            <li><strong>Discount %</strong>: 판매가에서 퍼센트 할인 (예: 15%)</li>
+            <li><strong>Fixed Price</strong>: 고정 가격 (예: 5000원)</li>
+          </ul>
+        </li>
+        <li><span class="key-badge">Set Pricing</span> 클릭 → 기존 설정이 있으면 덮어씁니다</li>
+      </ol>
+      <div class="tip-box"><strong>TIP:</strong> 상품별 설정이 없는 경우, 기본 할인율(Default Disc %)이 적용됩니다.</div>
+    </section>
+
+    <!-- ========== WHOLESALE ORDERS ========== -->
+    <section id="wholesale-orders" class="help-section mb-5">
+      <h3><i class="bi bi-receipt me-2"></i>Wholesale Orders <span class="badge bg-success">Mart</span></h3>
+      <p>도매 주문을 생성하고, 출고 처리 및 배송리스트(A4)를 인쇄합니다.</p>
+      <p><span class="menu-path">Sidebar → Wholesale Orders</span></p>
+
+      <h4>주문 프로세스</h4>
+      <div class="d-flex flex-wrap align-items-center gap-2 my-3">
+        <span class="badge bg-warning">Draft</span> <i class="bi bi-arrow-right"></i>
+        <span class="badge bg-info">Shipped</span> (재고 차감) <i class="bi bi-arrow-right"></i>
+        <span class="badge bg-success">Delivered</span>
+      </div>
+
+      <h4>도매 주문 생성</h4>
+      <ol class="step-list">
+        <li><span class="key-badge">New Order</span> 클릭</li>
+        <li>거래처 선택 (할인율 자동 적용), 주문일, 배송일, 메모 입력</li>
+        <li>상품 검색으로 주문 항목 추가 → 수량, 단가 입력</li>
+        <li>업체별 할인가가 자동 계산되어 최종 금액이 표시됩니다</li>
+        <li><span class="key-badge">Create Order</span> 클릭</li>
+      </ol>
+
+      <h4>출고 및 배송리스트</h4>
+      <ol class="step-list">
+        <li>주문 상세에서 <span class="key-badge">Ship (Deduct Inventory)</span> 클릭 → 재고 자동 차감</li>
+        <li><span class="key-badge">Print Delivery List</span> 클릭 → A4 용지 형식의 배송리스트가 새 탭에 열림</li>
+        <li>브라우저의 Print 버튼 또는 <span class="key-badge">Ctrl + P</span>로 인쇄</li>
+      </ol>
+      <div class="info-box"><strong>배송리스트에 포함되는 정보:</strong> 거래처명, 주소, 전화번호, 주문번호, 주문/배송일, 상품 목록, 수량, 단가, 합계, 서명란</div>
+    </section>
+
+    <!-- ========== SALES ========== -->
+    <section id="sales" class="help-section mb-5">
+      <h3><i class="bi bi-cash-stack me-2"></i>Sales <span class="badge bg-secondary">Non-POS</span></h3>
+      <p>POS 시스템을 사용하지 않는 경우, <strong>자체 판매를 기록</strong>하고 재고를 차감합니다.</p>
+      <p><span class="menu-path">Sidebar → Sales</span> (POS DB가 설정되지 않은 사업장만 표시)</p>
+
+      <h4>판매 프로세스</h4>
+      <div class="d-flex align-items-center gap-2 my-3">
+        <span class="badge bg-warning">Draft</span> <i class="bi bi-arrow-right"></i>
+        <span class="badge bg-success">Confirmed</span> (재고 차감)
+        <span class="mx-2">또는</span>
+        <span class="badge bg-secondary">Cancelled</span>
+      </div>
+
+      <h4>판매 생성</h4>
+      <ol class="step-list">
+        <li><span class="key-badge">New Sale</span> 클릭</li>
+        <li>판매일, 고객명(선택), 메모 입력</li>
+        <li>상품 검색으로 판매 항목 추가 → 수량, 단가 입력</li>
+        <li><span class="key-badge">Create Sale</span> 클릭 → Draft 상태로 생성</li>
+      </ol>
+
+      <h4>판매 확정</h4>
+      <ol class="step-list">
+        <li>판매 상세에서 <span class="key-badge">Confirm (Deduct Inventory)</span> 클릭</li>
+        <li>모든 판매 항목의 수량만큼 재고가 자동 차감됩니다</li>
+      </ol>
+
+      <h4>배송리스트 출력</h4>
+      <p><span class="key-badge">Print Delivery List</span> 클릭 → A4 배송리스트를 인쇄할 수 있습니다.</p>
+    </section>
+
+    <!-- ========== REPORTS ========== -->
+    <section id="reports" class="help-section mb-5">
+      <h3><i class="bi bi-bar-chart me-2"></i>Reports</h3>
+      <p>다양한 리포트를 조회하고 엑셀/CSV로 내보냅니다.</p>
+
+      <table class="table table-bordered help-table">
+        <thead><tr><th style="width:200px">리포트</th><th>경로</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Inventory Report</strong></td>
+            <td><span class="menu-path">Reports → Inventory Report</span></td>
+            <td>전체 재고 현황 (상품별 수량, 매입가, 판매가, 재고 가치). 매장별 필터 가능.</td>
+          </tr>
+          <tr>
+            <td><strong>Low Stock</strong></td>
+            <td><span class="menu-path">Reports → Low Stock</span></td>
+            <td>최소 재고량 이하 상품 목록. 부족 수량 표시.</td>
+          </tr>
+          <tr>
+            <td><strong>Purchase Report</strong></td>
+            <td><span class="menu-path">Reports → Inventory Report → 상단 기간 필터</span></td>
+            <td>기간별 매입 내역 및 합계 (거래처, 금액, 상태)</td>
+          </tr>
+          <tr>
+            <td><strong>Sales Report</strong></td>
+            <td><span class="menu-path">Reports → Sales Report</span></td>
+            <td>기간별 판매 내역 및 합계 (비POS 판매)</td>
+          </tr>
+          <tr>
+            <td><strong>Wholesale Report</strong></td>
+            <td><span class="menu-path">Reports → Wholesale Report</span></td>
+            <td>기간별 도매 주문, 할인, 최종 금액</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>내보내기</h4>
+      <ul>
+        <li><span class="key-badge"><i class="bi bi-file-earmark-excel"></i> Excel</span>: 서식이 포함된 엑셀 파일(.xlsx) 다운로드</li>
+        <li><span class="key-badge"><i class="bi bi-download"></i> CSV</span>: 쉼표로 구분된 텍스트 파일 다운로드</li>
+      </ul>
+    </section>
+
+    <!-- ========== BUSINESSES ========== -->
+    <section id="businesses" class="help-section mb-5">
+      <h3><i class="bi bi-building me-2"></i>Businesses</h3>
+      <p>사업장과 매장을 관리합니다. 관리자(Admin) 권한이 필요합니다.</p>
+      <p><span class="menu-path">Sidebar → Businesses</span></p>
+
+      <h4>사업장</h4>
+      <table class="table table-bordered table-sm help-table">
+        <thead><tr><th style="width:150px">필드</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Name</strong></td><td>사업장 이름</td></tr>
+          <tr><td><strong>Type</strong></td><td><span class="badge bg-info">Restaurant</span>: 식당 모드 (레시피 사용) / <span class="badge bg-success">Mart</span>: 마트 모드 (도매 사용)</td></tr>
+          <tr><td><strong>POS DB Name</strong></td><td>HANAPOS DB 이름 (예: order_sys). 비어있으면 비POS 모드 → Sales 메뉴 활성화</td></tr>
+          <tr><td><strong>Owner / Phone</strong></td><td>대표자명 및 연락처</td></tr>
+        </tbody>
+      </table>
+
+      <h4>매장 관리</h4>
+      <p>사업장 목록에서 <strong>Stores</strong> 링크를 클릭하면 해당 사업장의 매장을 관리할 수 있습니다.</p>
+      <ul>
+        <li>하나의 사업장에 여러 매장을 등록할 수 있습니다</li>
+        <li>재고는 매장 단위로 별도 관리됩니다</li>
+        <li>상단 매장 전환 드롭다운으로 현재 작업 매장을 변경합니다</li>
+      </ul>
+
+      <h4>사용자 권한</h4>
+      <table class="table table-bordered table-sm help-table" style="max-width:500px">
+        <thead><tr><th>역할</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge bg-danger">Admin</span></td><td>모든 기능 접근 가능, 사업장/매장/사용자 관리</td></tr>
+          <tr><td><span class="badge bg-primary">Manager</span></td><td>재고, 매입, 판매, 리포트 등 대부분의 운영 기능</td></tr>
+          <tr><td><span class="badge bg-secondary">Staff</span></td><td>재고 조회, 입출고 처리 등 기본 운영 기능</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Footer -->
+    <div class="text-center text-muted small mt-5 mb-3">
+      <hr>
+      <p>StockMaster User Manual v1.0 | &copy; 2026 HANAPOS</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+// 스크롤에 따라 사이드바 활성 링크 업데이트
+document.addEventListener('DOMContentLoaded', function() {
+  const sections = document.querySelectorAll('.help-section');
+  const navLinks = document.querySelectorAll('.help-sidebar .nav-link');
+  const observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        navLinks.forEach(function(l) { l.classList.remove('active'); });
+        const activeLink = document.querySelector('.help-sidebar .nav-link[href="#' + entry.target.id + '"]');
+        if (activeLink) activeLink.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(function(s) { observer.observe(s); });
+  // URL 해시로 섹션 이동
+  const hash = window.location.hash || '{{ "#" + active_section if active_section else "" }}';
+  if (hash) {
+    const target = document.querySelector(hash);
+    if (target) setTimeout(function() { target.scrollIntoView({ behavior: 'smooth' }); }, 300);
+  }
+});
+</script>
+{% endblock %}

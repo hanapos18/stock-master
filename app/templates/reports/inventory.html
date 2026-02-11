@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Inventory Report{% endblock %}
+{% block page_title %}Inventory Report{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <form class="d-flex gap-2" method="get">
+    <select name="store_id" class="form-select form-select-sm" style="width:180px" onchange="this.form.submit()">
+      <option value="0">All Stores</option>
+      {% for s in stores %}<option value="{{ s.id }}" {{ 'selected' if selected_store==s.id }}>{{ s.name }}</option>{% endfor %}
+    </select>
+  </form>
+  <div>
+    <span class="fw-bold me-3">Total Value: {{ total_value|fmt_price }}</span>
+    <a href="{{ url_for('report.download_excel', report_type='inventory') }}" class="btn btn-sm btn-success"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+    <button class="btn btn-sm btn-outline-success" onclick="exportTableToCSV('rptTable','inventory_report.csv')"><i class="bi bi-download me-1"></i>CSV</button>
+  </div>
+</div>
+<div class="card border-0 shadow-sm"><div class="table-responsive">
+  <table class="table table-hover table-sm mb-0" id="rptTable"><thead class="table-light"><tr>
+    <th>Code</th><th>Product</th><th>Category</th><th>Store</th><th>Unit</th><th>Qty</th><th>Buy Price</th><th>Sell Price</th><th>Value</th>
+  </tr></thead><tbody>
+    {% for r in data %}<tr>
+      <td><code>{{ r.code }}</code></td><td>{{ r.name }}</td><td>{{ r.category_name or '-' }}</td><td>{{ r.store_name or '-' }}</td>
+      <td>{{ r.unit }}</td><td class="fw-bold">{{ r.total_qty }}</td>
+      <td class="text-end">{{ r.unit_price|fmt_price }}</td><td class="text-end">{{ r.sell_price|fmt_price }}</td>
+      <td class="text-end">{{ (r.stock_value or 0)|fmt_price }}</td>
+    </tr>{% endfor %}
+    {% if not data %}<tr><td colspan="9" class="text-center text-muted py-3">No data</td></tr>{% endif %}
+  </tbody></table>
+</div></div>
+{% endblock %}

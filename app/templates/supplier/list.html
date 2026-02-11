@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Suppliers - StockMaster{% endblock %}
+{% block page_title %}Suppliers{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <h5>Supplier List</h5>
+  <a href="{{ url_for('supplier.create_supplier') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>New Supplier</a>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light"><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Products</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for s in suppliers %}
+        <tr>
+          <td><strong>{{ s.name }}</strong></td><td>{{ s.contact_person or '-' }}</td><td>{{ s.phone or '-' }}</td><td>{{ s.email or '-' }}</td>
+          <td>{{ s.product_count }}</td>
+          <td>
+            <a href="{{ url_for('supplier.edit_supplier', supplier_id=s.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+            <form method="post" action="{{ url_for('supplier.delete_supplier', supplier_id=s.id) }}" class="d-inline" onsubmit="return confirm('Deactivate?')"><button class="btn btn-sm btn-outline-danger">Delete</button></form>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not suppliers %}<tr><td colspan="6" class="text-center text-muted py-3">No suppliers</td></tr>{% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

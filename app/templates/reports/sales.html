@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Sales Report{% endblock %}
+{% block page_title %}Sales Report{% endblock %}
+{% block content %}
+<form class="d-flex gap-2 mb-3" method="get">
+  <input type="date" name="start_date" class="form-control form-control-sm" style="width:160px" value="{{ start_date }}">
+  <input type="date" name="end_date" class="form-control form-control-sm" style="width:160px" value="{{ end_date }}">
+  <button class="btn btn-sm btn-primary">Filter</button>
+  <span class="ms-auto fw-bold">Total: {{ total|fmt_price }}</span>
+  <a href="{{ url_for('report.download_excel', report_type='sales', start_date=start_date, end_date=end_date) }}" class="btn btn-sm btn-success"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+  <button type="button" class="btn btn-sm btn-outline-success" onclick="exportTableToCSV('rptTable','sales_report.csv')"><i class="bi bi-download me-1"></i>CSV</button>
+</form>
+<div class="card border-0 shadow-sm"><div class="table-responsive">
+  <table class="table table-hover table-sm mb-0" id="rptTable"><thead class="table-light"><tr>
+    <th>Date</th><th>Number</th><th>Customer</th><th>Store</th><th>Amount</th><th>Status</th>
+  </tr></thead><tbody>
+    {% for r in data %}<tr>
+      <td>{{ r.sale_date }}</td><td>{{ r.sale_number }}</td><td>{{ r.customer_name or '-' }}</td>
+      <td>{{ r.store_name }}</td><td class="text-end fw-bold">{{ r.total_amount|fmt_price }}</td>
+      <td><span class="badge bg-{{ 'success' if r.status=='confirmed' else 'warning' }}">{{ r.status }}</span></td>
+    </tr>{% endfor %}
+    {% if not data %}<tr><td colspan="6" class="text-center text-muted py-3">No data</td></tr>{% endif %}
+  </tbody></table>
+</div></div>
+{% endblock %}
