@@ -1,8 +1,6 @@
 """StockMaster Flask 앱 팩토리"""
-import os
 from datetime import timedelta
 from flask import Flask
-from flask_session import Session
 from app.db import init_db
 
 
@@ -12,13 +10,10 @@ def create_app() -> Flask:
     application = Flask(__name__)
     application.secret_key = config.SECRET_KEY
     application.permanent_session_lifetime = timedelta(hours=24)
-    application.config["SESSION_TYPE"] = "filesystem"
-    application.config["SESSION_FILE_DIR"] = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "flask_sessions")
-    application.config["SESSION_PERMANENT"] = True
-    application.config["SESSION_USE_SIGNER"] = True
-    application.config["SESSION_FILE_THRESHOLD"] = 500
-    Session(application)
+    application.config["SESSION_COOKIE_NAME"] = "stk_session"
+    application.config["SESSION_COOKIE_HTTPONLY"] = True
+    application.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    application.config["SESSION_REFRESH_EACH_REQUEST"] = False
     init_db(application)
     _register_blueprints(application)
     _register_context_processors(application)
@@ -105,13 +100,15 @@ def _register_error_handlers(application: Flask) -> None:
         if "user" in session:
             flash(f"Error: {str(error)[:100]}", "danger")
             referrer = request.referrer
-            if referrer and "/auth/" not in referrer:
+            if referrer and "/login" not in referrer:
                 return redirect(referrer)
             return redirect(url_for("dashboard.index"))
         return redirect(url_for("auth.login"))
 
     @application.before_request
     def ensure_session_store():
+        if request.path.startswith("/static/"):
+            return
         if "user" not in session:
             return
         if "store" not in session and "business" in session:
@@ -124,6 +121,7 @@ def _register_error_handlers(application: Flask) -> None:
                 if stores:
                     session["store"] = stores[0]
                     session["stores"] = stores
+                    session.modified = True
                     print(f"🔧 세션에 store 자동 복구: {stores[0]['name']}")
             except Exception as e:
                 print(f"❌ store 복구 실패: {e}")
