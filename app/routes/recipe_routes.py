@@ -1,7 +1,9 @@
 """레시피 관리 라우트 (식당용)"""
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+from io import BytesIO
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from app.routes.dashboard_routes import login_required
 from app.controllers import recipe_controller
+from app.services.excel_service import generate_recipe_template, generate_excel_report
 
 recipe_bp = Blueprint("recipe", __name__, url_prefix="/recipes")
 
@@ -93,6 +95,75 @@ def deduct_recipe():
     )
     flash(f"Deducted {len(results)} ingredients from inventory", "success")
     return redirect(url_for("inventory.list_inventory"))
+
+
+@recipe_bp.route("/excel/template")
+@login_required
+def download_template():
+    """레시피 업로드용 엑셀 템플릿 다운로드"""
+    output = generate_recipe_template()
+    return send_file(output, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                     as_attachment=True, download_name="recipe_upload_template.xlsx")
+
+
+@recipe_bp.route("/excel/export")
+@login_required
+def export_excel():
+    """레시피 목록 엑셀 내보내기 (레시피별 원재료 포함)"""
+    business_id = session["business"]["id"]
+    recipes = recipe_controller.load_recipes(business_id)
+    headers = ["Recipe Name", "Product Code", "Product Name", "Quantity", "Unit",
+               "Yield Qty", "Yield Unit", "Description"]
+    rows = []
+    for r in recipes:
+        detail = recipe_controller.load_recipe(r["id"])
+        if detail and detail.get("ingredients"):
+            for item in detail["ingredients"]:
+                rows.append([r["name"], item.get("product_code", ""), item.get("product_name", ""),
+                             float(item["quantity"]), item.get("unit", "") or item.get("product_unit", ""),
+                             float(r.get("yield_quantity", 1)), r.get("yield_unit", "ea"),
+                             r.get("description", "") or ""])
+        else:
+            rows.append([r["name"], "", "", 0, "", float(r.get("yield_quantity", 1)),
+                         r.get("yield_unit", "ea"), r.get("description", "") or ""])
+    output = generate_excel_report("Recipes", headers, rows,
+                                   column_widths=[25, 14, 25, 12, 10, 12, 12, 30])
+    return send_file(output, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                     as_attachment=True, download_name="recipes_export.xlsx")
+
+
+@recipe_bp.route("/excel/upload", methods=["POST"])
+@login_required
+def upload_excel():
+    """엑셀 파일로 레시피 일괄 업로드"""
+    business_id = session["business"]["id"]
+    file = request.files.get("excel_file")
+    if not file or not file.filename:
+        flash("Please select an Excel file", "warning")
+        return redirect(url_for("recipe.list_recipes"))
+    if not file.filename.lower().endswith((".xlsx", ".xls")):
+        flash("Only .xlsx or .xls files are supported", "danger")
+        return redirect(url_for("recipe.list_recipes"))
+    try:
+        file_stream = BytesIO(file.read())
+        result = recipe_controller.import_recipes_from_excel(business_id, file_stream)
+        msgs = []
+        if result["created"]:
+            msgs.append(f"{result['created']} created")
+        if result["updated"]:
+            msgs.append(f"{result['updated']} updated")
+        if result["items"]:
+            msgs.append(f"{result['items']} ingredients")
+        summary = ", ".join(msgs) if msgs else "No recipes processed"
+        if result["errors"]:
+            error_preview = "; ".join(result["errors"][:5])
+            flash(f"Import: {summary}. Errors: {error_preview}", "warning")
+        else:
+            flash(f"Import complete: {summary}", "success")
+    except Exception as e:
+        print(f"❌ 레시피 엑셀 업로드 오류: {str(e)}")
+        flash(f"Upload failed: {str(e)}", "danger")
+    return redirect(url_for("recipe.list_recipes"))
 
 
 def _extract_recipe_items(form) -> list:

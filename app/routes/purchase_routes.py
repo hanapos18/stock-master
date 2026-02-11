@@ -1,7 +1,9 @@
 """매입 관리 라우트"""
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+from io import BytesIO
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from app.routes.dashboard_routes import login_required
 from app.controllers import purchase_controller, supplier_controller, attachment_controller
+from app.services.excel_service import generate_purchase_template, generate_excel_report
 
 purchase_bp = Blueprint("purchase", __name__, url_prefix="/purchases")
 
@@ -76,6 +78,75 @@ def cancel_purchase(purchase_id: int):
     purchase_controller.cancel_purchase(purchase_id)
     flash("Purchase cancelled", "warning")
     return redirect(url_for("purchase.list_purchases"))
+
+
+@purchase_bp.route("/excel/template")
+@login_required
+def download_template():
+    """매입 업로드용 엑셀 템플릿 다운로드"""
+    output = generate_purchase_template()
+    return send_file(output, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                     as_attachment=True, download_name="purchase_upload_template.xlsx")
+
+
+@purchase_bp.route("/excel/export")
+@login_required
+def export_excel():
+    """매입 목록 엑셀 내보내기"""
+    business_id = session["business"]["id"]
+    purchases = purchase_controller.load_purchases(business_id)
+    headers = ["Number", "Date", "Supplier", "Store", "Amount", "Status", "Memo"]
+    rows = [[p["purchase_number"], str(p["purchase_date"]), p.get("supplier_name", "") or "",
+             p.get("store_name", ""), float(p["total_amount"]),
+             p["status"], p.get("memo", "") or ""] for p in purchases]
+    output = generate_excel_report("Purchases", headers, rows,
+                                   column_widths=[20, 14, 20, 18, 16, 12, 25])
+    return send_file(output, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                     as_attachment=True, download_name="purchases_export.xlsx")
+
+
+@purchase_bp.route("/excel/upload", methods=["POST"])
+@login_required
+def upload_excel():
+    """엑셀 파일로 매입 일괄 업로드"""
+    business_id = session["business"]["id"]
+    store = session.get("store")
+    if not store:
+        flash("No store selected", "danger")
+        return redirect(url_for("purchase.list_purchases"))
+    file = request.files.get("excel_file")
+    if not file or not file.filename:
+        flash("Please select an Excel file", "warning")
+        return redirect(url_for("purchase.list_purchases"))
+    if not file.filename.lower().endswith((".xlsx", ".xls")):
+        flash("Only .xlsx or .xls files are supported", "danger")
+        return redirect(url_for("purchase.list_purchases"))
+    try:
+        file_stream = BytesIO(file.read())
+        result = purchase_controller.import_purchases_from_excel(
+            business_id, store["id"], session["user"]["id"], file_stream)
+        _flash_purchase_import_result(result)
+    except Exception as e:
+        print(f"❌ 매입 엑셀 업로드 오류: {str(e)}")
+        flash(f"Upload failed: {str(e)}", "danger")
+    return redirect(url_for("purchase.list_purchases"))
+
+
+def _flash_purchase_import_result(result: dict) -> None:
+    """매입 업로드 결과 플래시 메시지."""
+    msgs = []
+    if result["created"]:
+        msgs.append(f"{result['created']} purchases created ({result['items']} items)")
+    if result["skipped"]:
+        msgs.append(f"{result['skipped']} skipped")
+    summary = ", ".join(msgs) if msgs else "No purchases processed"
+    if result["errors"]:
+        error_preview = "; ".join(result["errors"][:5])
+        if len(result["errors"]) > 5:
+            error_preview += f" ... +{len(result['errors']) - 5} more"
+        flash(f"Import: {summary}. Errors: {error_preview}", "warning")
+    else:
+        flash(f"Import complete: {summary}", "success")
 
 
 def _extract_items(form) -> list:

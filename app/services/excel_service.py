@@ -271,3 +271,263 @@ def _set_template_column_widths(sheet, headers: List[str], widths: List[int]) ->
     """템플릿 시트의 열 너비를 설정합니다."""
     for col_idx, width in enumerate(widths, 1):
         sheet.column_dimensions[get_column_letter(col_idx)].width = width
+
+
+# ── 매입(Purchase) 엑셀 가져오기 ──
+
+PURCHASE_TEMPLATE_HEADERS = [
+    "Purchase Date*", "Supplier", "Product Code*", "Product Name",
+    "Quantity*", "Unit Price*", "Memo",
+]
+PURCHASE_TEMPLATE_WIDTHS = [16, 20, 14, 25, 12, 14, 25]
+PURCHASE_SAMPLE_ROWS = [
+    ["2026-02-11", "ABC Supplier", "P0001", "Rice 10kg", 10, 25000, "Monthly order"],
+    ["2026-02-11", "ABC Supplier", "P0002", "Soy Sauce 1L", 20, 3500, "Monthly order"],
+    ["2026-02-12", "XYZ Mart", "P0003", "Sugar 1kg", 5, 2000, ""],
+]
+
+
+def generate_purchase_template() -> BytesIO:
+    """매입 업로드용 엑셀 템플릿을 생성합니다."""
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Purchases"
+    _write_purchase_instructions(workbook)
+    _write_template_header_row(sheet, PURCHASE_TEMPLATE_HEADERS)
+    _write_data_rows(sheet, PURCHASE_SAMPLE_ROWS, start_row=2)
+    _set_template_column_widths(sheet, PURCHASE_TEMPLATE_HEADERS, PURCHASE_TEMPLATE_WIDTHS)
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return output
+
+
+def parse_purchase_excel(file_stream: BytesIO) -> Tuple[List[Dict], List[str]]:
+    """매입 엑셀 파일을 파싱합니다. 같은 날짜+공급처+메모를 하나의 매입으로 그룹핑."""
+    workbook = load_workbook(file_stream, read_only=True, data_only=True)
+    sheet = _find_data_sheet(workbook)
+    header_map = _build_purchase_header_map(sheet)
+    if not header_map:
+        return [], ["Invalid template: required headers not found"]
+    rows: List[Dict] = []
+    errors: List[str] = []
+    for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+        if _is_empty_row(row):
+            continue
+        parsed, row_errors = _parse_purchase_row(row, header_map, row_idx)
+        if row_errors:
+            errors.extend(row_errors)
+        else:
+            rows.append(parsed)
+    workbook.close()
+    return rows, errors
+
+
+def _build_purchase_header_map(sheet) -> Dict[str, int]:
+    """매입 헤더 매핑을 생성합니다."""
+    normalize = {
+        "purchase date": "purchase_date", "purchase date*": "purchase_date",
+        "date": "purchase_date", "date*": "purchase_date",
+        "supplier": "supplier", "supplier name": "supplier",
+        "product code": "product_code", "product code*": "product_code",
+        "code": "product_code", "code*": "product_code",
+        "product name": "product_name", "name": "product_name",
+        "quantity": "quantity", "quantity*": "quantity", "qty": "quantity",
+        "unit price": "unit_price", "unit price*": "unit_price", "price": "unit_price",
+        "memo": "memo", "note": "memo",
+    }
+    first_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), None)
+    if not first_row:
+        return {}
+    header_map: Dict[str, int] = {}
+    for col_idx, cell_value in enumerate(first_row):
+        if cell_value is None:
+            continue
+        key = str(cell_value).strip().lower().replace("_", " ")
+        if key in normalize:
+            header_map[normalize[key]] = col_idx
+    if "product_code" not in header_map or "quantity" not in header_map:
+        return {}
+    return header_map
+
+
+def _parse_purchase_row(row: tuple, header_map: Dict[str, int],
+                        row_idx: int) -> Tuple[Dict, List[str]]:
+    """매입 한 행을 파싱합니다."""
+    errors: List[str] = []
+    def get_val(field: str, default=""):
+        idx = header_map.get(field)
+        if idx is None or idx >= len(row) or row[idx] is None:
+            return default
+        return str(row[idx]).strip()
+    product_code = get_val("product_code")
+    if not product_code:
+        errors.append(f"Row {row_idx}: Product Code is required")
+    quantity = _parse_number(get_val("quantity", "0"), f"Row {row_idx} Quantity", errors)
+    if quantity <= 0 and not errors:
+        errors.append(f"Row {row_idx}: Quantity must be greater than 0")
+    unit_price = _parse_number(get_val("unit_price", "0"), f"Row {row_idx} Unit Price", errors)
+    date_val = get_val("purchase_date")
+    if date_val and "datetime" in str(type(row[header_map.get("purchase_date", 0)])).lower():
+        date_val = row[header_map["purchase_date"]].strftime("%Y-%m-%d")
+    return {
+        "purchase_date": date_val,
+        "supplier_name": get_val("supplier"),
+        "product_code": product_code,
+        "product_name": get_val("product_name"),
+        "quantity": quantity,
+        "unit_price": unit_price,
+        "memo": get_val("memo"),
+    }, errors
+
+
+def _write_purchase_instructions(workbook: Workbook) -> None:
+    """매입 템플릿 안내 시트를 추가합니다."""
+    sheet = workbook.create_sheet("Instructions")
+    instructions = [
+        ("Purchase Upload Template Instructions", ""),
+        ("", ""),
+        ("1. Fill in the 'Purchases' sheet with your purchase data.", ""),
+        ("2. Rows with the same Date + Supplier + Memo are grouped into one purchase.", ""),
+        ("3. Product Code must match existing products in the system.", ""),
+        ("4. Purchase Date format: YYYY-MM-DD", ""),
+        ("5. Supplier name must match existing suppliers.", ""),
+        ("6. Delete the sample rows before uploading.", ""),
+    ]
+    for row_idx, (col_a, col_b) in enumerate(instructions, 1):
+        sheet.cell(row=row_idx, column=1, value=col_a)
+        if row_idx == 1:
+            sheet.cell(row=row_idx, column=1).font = Font(bold=True, size=14)
+    sheet.column_dimensions["A"].width = 60
+    workbook.move_sheet("Instructions", offset=-1)
+
+
+# ── 레시피(Recipe) 엑셀 가져오기 ──
+
+RECIPE_TEMPLATE_HEADERS = [
+    "Recipe Name*", "Product Code*", "Product Name",
+    "Quantity*", "Unit", "Yield Qty", "Yield Unit", "Description",
+]
+RECIPE_TEMPLATE_WIDTHS = [25, 14, 25, 12, 10, 12, 12, 30]
+RECIPE_SAMPLE_ROWS = [
+    ["Fried Rice", "P0001", "Rice 10kg", 0.3, "kg", 1, "plate", "Basic fried rice"],
+    ["Fried Rice", "P0002", "Soy Sauce 1L", 0.02, "L", 1, "plate", "Basic fried rice"],
+    ["Fried Rice", "P0010", "Cooking Oil", 0.05, "L", 1, "plate", "Basic fried rice"],
+    ["Miso Soup", "P0020", "Miso Paste", 0.03, "kg", 1, "bowl", ""],
+    ["Miso Soup", "P0021", "Tofu", 0.1, "block", 1, "bowl", ""],
+]
+
+
+def generate_recipe_template() -> BytesIO:
+    """레시피 업로드용 엑셀 템플릿을 생성합니다."""
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Recipes"
+    _write_recipe_instructions(workbook)
+    _write_template_header_row(sheet, RECIPE_TEMPLATE_HEADERS)
+    _write_data_rows(sheet, RECIPE_SAMPLE_ROWS, start_row=2)
+    _set_template_column_widths(sheet, RECIPE_TEMPLATE_HEADERS, RECIPE_TEMPLATE_WIDTHS)
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return output
+
+
+def parse_recipe_excel(file_stream: BytesIO) -> Tuple[List[Dict], List[str]]:
+    """레시피 엑셀 파일을 파싱합니다. 같은 Recipe Name을 하나의 레시피로 그룹핑."""
+    workbook = load_workbook(file_stream, read_only=True, data_only=True)
+    sheet = _find_data_sheet(workbook)
+    header_map = _build_recipe_header_map(sheet)
+    if not header_map:
+        return [], ["Invalid template: required headers not found"]
+    rows: List[Dict] = []
+    errors: List[str] = []
+    for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+        if _is_empty_row(row):
+            continue
+        parsed, row_errors = _parse_recipe_row(row, header_map, row_idx)
+        if row_errors:
+            errors.extend(row_errors)
+        else:
+            rows.append(parsed)
+    workbook.close()
+    return rows, errors
+
+
+def _build_recipe_header_map(sheet) -> Dict[str, int]:
+    """레시피 헤더 매핑을 생성합니다."""
+    normalize = {
+        "recipe name": "recipe_name", "recipe name*": "recipe_name",
+        "recipe": "recipe_name", "menu name": "recipe_name",
+        "product code": "product_code", "product code*": "product_code",
+        "code": "product_code", "code*": "product_code",
+        "product name": "product_name", "name": "product_name",
+        "quantity": "quantity", "quantity*": "quantity", "qty": "quantity",
+        "unit": "unit",
+        "yield qty": "yield_quantity", "yield quantity": "yield_quantity",
+        "yield unit": "yield_unit",
+        "description": "description",
+    }
+    first_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), None)
+    if not first_row:
+        return {}
+    header_map: Dict[str, int] = {}
+    for col_idx, cell_value in enumerate(first_row):
+        if cell_value is None:
+            continue
+        key = str(cell_value).strip().lower().replace("_", " ")
+        if key in normalize:
+            header_map[normalize[key]] = col_idx
+    if "recipe_name" not in header_map or "product_code" not in header_map:
+        return {}
+    return header_map
+
+
+def _parse_recipe_row(row: tuple, header_map: Dict[str, int],
+                      row_idx: int) -> Tuple[Dict, List[str]]:
+    """레시피 한 행을 파싱합니다."""
+    errors: List[str] = []
+    def get_val(field: str, default=""):
+        idx = header_map.get(field)
+        if idx is None or idx >= len(row) or row[idx] is None:
+            return default
+        return str(row[idx]).strip()
+    recipe_name = get_val("recipe_name")
+    product_code = get_val("product_code")
+    if not recipe_name:
+        errors.append(f"Row {row_idx}: Recipe Name is required")
+    if not product_code:
+        errors.append(f"Row {row_idx}: Product Code is required")
+    quantity = _parse_number(get_val("quantity", "0"), f"Row {row_idx} Quantity", errors)
+    yield_qty = _parse_number(get_val("yield_quantity", "1"), f"Row {row_idx} Yield Qty", errors)
+    return {
+        "recipe_name": recipe_name,
+        "product_code": product_code,
+        "product_name": get_val("product_name"),
+        "quantity": quantity,
+        "unit": get_val("unit"),
+        "yield_quantity": yield_qty if yield_qty > 0 else 1,
+        "yield_unit": get_val("yield_unit", "ea") or "ea",
+        "description": get_val("description"),
+    }, errors
+
+
+def _write_recipe_instructions(workbook: Workbook) -> None:
+    """레시피 템플릿 안내 시트를 추가합니다."""
+    sheet = workbook.create_sheet("Instructions")
+    instructions = [
+        ("Recipe Upload Template Instructions", ""),
+        ("", ""),
+        ("1. Fill in the 'Recipes' sheet with your recipe data.", ""),
+        ("2. Rows with the same Recipe Name are grouped into one recipe.", ""),
+        ("3. Product Code must match existing products in the system.", ""),
+        ("4. Yield Qty/Unit: how much one batch makes (e.g. 1 plate).", ""),
+        ("5. If recipe already exists (same name), it will be updated.", ""),
+        ("6. Delete the sample rows before uploading.", ""),
+    ]
+    for row_idx, (col_a, col_b) in enumerate(instructions, 1):
+        sheet.cell(row=row_idx, column=1, value=col_a)
+        if row_idx == 1:
+            sheet.cell(row=row_idx, column=1).font = Font(bold=True, size=14)
+    sheet.column_dimensions["A"].width = 60
+    workbook.move_sheet("Instructions", offset=-1)

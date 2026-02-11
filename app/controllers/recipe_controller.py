@@ -1,7 +1,9 @@
 """레시피 관리 비즈니스 로직 (식당용)"""
 from typing import Dict, List, Optional
+from io import BytesIO
 from app.db import fetch_one, fetch_all, insert, execute, execute_pos_db
 from app.controllers.inventory_controller import process_stock_out
+from app.services.excel_service import parse_recipe_excel
 
 
 def load_recipes(business_id: int) -> List[Dict]:
@@ -102,6 +104,90 @@ def calculate_recipe_cost(recipe_id: int) -> Dict:
         total_cost += cost
         items_with_cost.append({**item, "cost": cost})
     return {"total_cost": total_cost, "items": items_with_cost}
+
+
+def import_recipes_from_excel(business_id: int, file_stream: BytesIO) -> Dict:
+    """엑셀 파일에서 레시피를 일괄 등록/수정합니다. 같은 Recipe Name을 그룹핑."""
+    rows, parse_errors = parse_recipe_excel(file_stream)
+    result = {"created": 0, "updated": 0, "items": 0, "skipped": 0, "errors": list(parse_errors)}
+    if parse_errors and not rows:
+        return result
+    product_map = _build_product_code_map(business_id)
+    groups = _group_recipe_rows(rows)
+    for recipe_name, ingredients in groups.items():
+        try:
+            _process_recipe_group(business_id, recipe_name, ingredients, product_map, result)
+        except Exception as e:
+            result["errors"].append(f"Recipe '{recipe_name}': {str(e)}")
+            result["skipped"] += 1
+    print(f"📊 레시피 엑셀 가져오기 완료 - 생성: {result['created']}, "
+          f"수정: {result['updated']}, 원재료: {result['items']}, 오류: {len(result['errors'])}")
+    return result
+
+
+def _build_product_code_map(business_id: int) -> Dict[str, int]:
+    """상품 코드 → ID 매핑."""
+    products = fetch_all(
+        "SELECT id, code FROM stk_products WHERE business_id = %s AND is_active = 1",
+        (business_id,))
+    return {p["code"].strip().upper(): p["id"] for p in products}
+
+
+def _group_recipe_rows(rows: List[Dict]) -> Dict[str, List[Dict]]:
+    """같은 레시피명을 그룹핑."""
+    from collections import OrderedDict
+    groups: OrderedDict = OrderedDict()
+    for row in rows:
+        name = row.get("recipe_name", "")
+        if name not in groups:
+            groups[name] = []
+        groups[name].append(row)
+    return groups
+
+
+def _process_recipe_group(business_id: int, recipe_name: str,
+                          ingredients: List[Dict], product_map: Dict,
+                          result: Dict) -> None:
+    """레시피 그룹을 처리하여 레시피를 생성 또는 수정합니다."""
+    first = ingredients[0]
+    valid_items = []
+    for item in ingredients:
+        code = item["product_code"].strip().upper()
+        product_id = product_map.get(code)
+        if not product_id:
+            result["errors"].append(f"Recipe '{recipe_name}': product '{item['product_code']}' not found")
+            continue
+        valid_items.append({
+            "product_id": product_id,
+            "quantity": item["quantity"],
+            "unit": item.get("unit", ""),
+        })
+    if not valid_items:
+        result["skipped"] += 1
+        return
+    existing = fetch_one(
+        "SELECT id FROM stk_recipes WHERE business_id = %s AND name = %s AND is_active = 1",
+        (business_id, recipe_name))
+    if existing:
+        data = {
+            "name": recipe_name,
+            "description": first.get("description", ""),
+            "yield_quantity": first.get("yield_quantity", 1),
+            "yield_unit": first.get("yield_unit", "ea"),
+        }
+        update_recipe(existing["id"], data, valid_items)
+        result["updated"] += 1
+    else:
+        data = {
+            "business_id": business_id,
+            "name": recipe_name,
+            "description": first.get("description", ""),
+            "yield_quantity": first.get("yield_quantity", 1),
+            "yield_unit": first.get("yield_unit", "ea"),
+        }
+        save_recipe(data, valid_items)
+        result["created"] += 1
+    result["items"] += len(valid_items)
 
 
 def _save_recipe_items(recipe_id: int, items: List[Dict]) -> None:
