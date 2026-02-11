@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - StockMaster{% endblock %}
+{% block title %}Dashboard - Hana StockMaster{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 {% block content %}
 <!-- 요약 카드 -->
@@ -36,7 +36,7 @@
         <div class="d-flex justify-content-between align-items-center">
           <div>
             <h6 class="text-muted mb-1">Total Quantity</h6>
-            <h3 class="mb-0">{{ "%.1f"|format(summary.total_quantity) }}</h3>
+            <h3 class="mb-0">{{ summary.total_quantity|fmt_qty }}</h3>
           </div>
           <div class="bg-info bg-opacity-10 p-3 rounded"><i class="bi bi-archive fs-4 text-info"></i></div>
         </div>
@@ -76,9 +76,9 @@
               {% for tx in recent_transactions %}
               <tr>
                 <td class="small">{{ tx.created_at.strftime('%m/%d %H:%M') if tx.created_at else '' }}</td>
-                <td><span class="badge bg-{{ 'success' if tx.type=='in' else 'danger' if tx.type in ('out','discard','sale') else 'warning' }}">{{ tx.type|upper }}</span></td>
+                <td><span class="badge bg-{{ 'success' if tx.type in ('in','transfer_in') else 'danger' if tx.type in ('out','discard','sale','transfer_out') else 'warning' }}">{{ tx.type|upper|replace('_',' ') }}</span></td>
                 <td>{{ tx.product_name }}</td>
-                <td>{{ tx.quantity }}</td>
+                <td>{{ tx.quantity|fmt_qty }}</td>
               </tr>
               {% endfor %}
               {% if not recent_transactions %}
@@ -90,8 +90,66 @@
       </div>
     </div>
   </div>
-  <!-- 재고 부족 -->
+  <!-- 재고 부족 + 유통기한 -->
   <div class="col-lg-5">
+    <!-- 유통기한 알림 -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-calendar-x me-1 text-danger"></i>Expiry Alerts</h6>
+        <a href="{{ url_for('report.expiry_report') }}" class="btn btn-sm btn-outline-danger">View All</a>
+      </div>
+      <div class="card-body py-3">
+        <div class="d-flex gap-3">
+          <div class="text-center flex-fill">
+            <a href="{{ url_for('report.expiry_report', filter='expired') }}" class="text-decoration-none">
+              <h4 class="mb-0 {{ 'text-danger' if expiry_alerts.expired_count > 0 else 'text-muted' }}">{{ expiry_alerts.expired_count }}</h4>
+              <small class="text-muted">Expired</small>
+            </a>
+          </div>
+          <div class="vr"></div>
+          <div class="text-center flex-fill">
+            <a href="{{ url_for('report.expiry_report', filter='month') }}" class="text-decoration-none">
+              <h4 class="mb-0 {{ 'text-warning' if expiry_alerts.expiring_count > 0 else 'text-muted' }}">{{ expiry_alerts.expiring_count }}</h4>
+              <small class="text-muted">Expiring (30d)</small>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- POS 연동 상태 -->
+    {% if has_pos %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-link-45deg me-1 text-primary"></i>POS Sync</h6>
+        <button class="btn btn-sm btn-outline-primary" id="syncBtn" onclick="runPosSync()">
+          <i class="bi bi-arrow-repeat me-1"></i>Sync Now
+        </button>
+      </div>
+      <div class="card-body py-3" id="syncStatus">
+        {% if pos_sync.checkpoints %}
+        <div class="small">
+          {% for table, info in pos_sync.checkpoints.items() %}
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-muted">{{ table }}</span>
+            <span>
+              <span class="badge bg-secondary">ID: {{ info.pos_last_id }}</span>
+              <span class="text-muted ms-1">{{ info.synced_at.strftime('%m/%d %H:%M') if info.synced_at else 'Never' }}</span>
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted text-center small">No sync history yet</div>
+        {% endif %}
+        {% if pos_sync.recent_errors > 0 %}
+        <div class="mt-2">
+          <span class="badge bg-danger">{{ pos_sync.recent_errors }} errors (24h)</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+    <!-- 재고 부족 -->
     <div class="card border-0 shadow-sm">
       <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <h6 class="mb-0">Low Stock Alerts</h6>
@@ -107,8 +165,8 @@
               {% for item in low_stock %}
               <tr>
                 <td>{{ item.name }}</td>
-                <td class="text-danger fw-bold">{{ item.current_stock }} {{ item.unit }}</td>
-                <td>{{ item.min_stock }}</td>
+                <td class="text-danger fw-bold">{{ item.current_stock|fmt_qty }} {{ item.unit }}</td>
+                <td>{{ item.min_stock|fmt_qty }}</td>
               </tr>
               {% endfor %}
               {% if not low_stock %}
@@ -122,6 +180,72 @@
   </div>
 </div>
 
+<!-- 매장 간 이동 & 매장별 재고 -->
+{% if has_multi_stores %}
+<div class="row g-3 mt-3">
+  <!-- Pending Transfers -->
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-arrow-left-right me-1 text-primary"></i>Transfers</h6>
+        <a href="{{ url_for('transfer.list_transfers') }}" class="btn btn-sm btn-outline-primary">View All</a>
+      </div>
+      <div class="card-body py-3">
+        <div class="d-flex gap-3">
+          <div class="text-center flex-fill">
+            <a href="{{ url_for('transfer.list_transfers', view='my', status='shipped') }}" class="text-decoration-none">
+              <h4 class="mb-0 {{ 'text-primary' if transfer_counts.outgoing > 0 else 'text-muted' }}">{{ transfer_counts.outgoing }}</h4>
+              <small class="text-muted">Outgoing</small>
+            </a>
+          </div>
+          <div class="vr"></div>
+          <div class="text-center flex-fill">
+            <a href="{{ url_for('transfer.list_transfers', view='my', status='shipped') }}" class="text-decoration-none">
+              <h4 class="mb-0 {{ 'text-warning' if transfer_counts.incoming > 0 else 'text-muted' }}">{{ transfer_counts.incoming }}</h4>
+              <small class="text-muted">To Receive</small>
+            </a>
+          </div>
+        </div>
+        <div class="mt-3 text-center">
+          <a href="{{ url_for('transfer.create_transfer') }}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>New Transfer</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- 매장별 재고 요약 -->
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-shop me-1 text-info"></i>Store Inventory Summary</h6>
+        <a href="{{ url_for('inventory.all_stores_inventory') }}" class="btn btn-sm btn-outline-info">All Stores</a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr><th>Store</th><th class="text-end">Products</th><th class="text-end">Total Qty</th></tr>
+            </thead>
+            <tbody>
+              {% for s in store_inventory %}
+              <tr>
+                <td>
+                  {{ s.name }}
+                  {% if s.is_warehouse %}<span class="badge bg-primary ms-1">Warehouse</span>{% endif %}
+                </td>
+                <td class="text-end">{{ s.product_count }}</td>
+                <td class="text-end fw-bold">{{ s.total_quantity|fmt_qty }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- 빠른 작업 -->
 <div class="row g-3 mt-3">
   <div class="col-12">
@@ -132,6 +256,7 @@
           <a href="{{ url_for('inventory.stock_in') }}" class="btn btn-success"><i class="bi bi-plus-circle me-1"></i>Stock In</a>
           <a href="{{ url_for('inventory.stock_out') }}" class="btn btn-danger"><i class="bi bi-dash-circle me-1"></i>Stock Out</a>
           <a href="{{ url_for('purchase.create_purchase') }}" class="btn btn-primary"><i class="bi bi-cart-plus me-1"></i>New Purchase</a>
+          <a href="{{ url_for('transfer.create_transfer') }}" class="btn btn-info"><i class="bi bi-arrow-left-right me-1"></i>Transfer</a>
           <a href="{{ url_for('product.create_product') }}" class="btn btn-outline-primary"><i class="bi bi-tag me-1"></i>New Product</a>
           <a href="{{ url_for('stock_count.create_count') }}" class="btn btn-outline-warning"><i class="bi bi-clipboard-check me-1"></i>Stock Count</a>
           {% if current_business and current_business.type == 'restaurant' %}
@@ -145,4 +270,44 @@
     </div>
   </div>
 </div>
+{% endblock %}
+{% block scripts %}
+{% if has_pos %}
+<script>
+function runPosSync() {
+  var btn = document.getElementById('syncBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Syncing...';
+  fetch('/api/pos/sync', { method: 'POST', headers: {'Content-Type': 'application/json'} })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Sync Now';
+      if (data.success) {
+        var r = data.result;
+        var master = r.master || {};
+        var cats = master.categories || {};
+        var prods = master.products || {};
+        var sales = r.sales || {};
+        var stock = r.stock_transactions || {};
+        var lines = [];
+        if (cats.created > 0) lines.push('Categories: +' + cats.created + ' new');
+        if (prods.created > 0 || prods.updated > 0) lines.push('Products: +' + (prods.created||0) + ' new, ' + (prods.updated||0) + ' updated');
+        if (sales.synced > 0 || sales.total > 0) lines.push('Sales: ' + (sales.synced||0) + '/' + (sales.total||0) + ' synced');
+        if (stock.synced > 0 || stock.total > 0) lines.push('Stock: ' + (stock.synced||0) + '/' + (stock.total||0) + ' synced');
+        if (lines.length === 0) lines.push('Everything is up to date');
+        alert('Sync completed!\n' + lines.join('\n'));
+        location.reload();
+      } else {
+        alert('Sync failed: ' + (data.error || 'Unknown error'));
+      }
+    })
+    .catch(function(err) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Sync Now';
+      alert('Sync error: ' + err);
+    });
+}
+</script>
+{% endif %}
 {% endblock %}

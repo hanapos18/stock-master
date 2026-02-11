@@ -26,7 +26,7 @@ def seed_all():
     stk = get_connection(STK_DB)
 
     print("=" * 60)
-    print("  StockMaster 기본 데이터 삽입 (order_sys 참조)")
+    print("  Hana StockMaster 기본 데이터 삽입 (order_sys 참조)")
     print("=" * 60)
 
     # 1. 기존 데이터 정리
@@ -226,7 +226,7 @@ def seed_products(pos, stk, business_id: int, category_map: dict, supplier_map: 
             name = item["mname"].strip()
             if not name:
                 continue
-            code = f"M{item['mcode'].strip()}" if item["mcode"] else f"M{item['id']:04d}"
+            code = item['mcode'].strip() if item["mcode"] else f"{item['id']:04d}"
             sell_price = float(item["mprice1"] or 0)
             cost_price = float(item["cost_price"] or 0)
             barcode = item.get("barcode") or ""

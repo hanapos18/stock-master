@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}New Purchase - StockMaster{% endblock %}
+{% block title %}New Purchase - Hana StockMaster{% endblock %}
 {% block page_title %}New Purchase{% endblock %}
 {% block content %}
 <div class="card border-0 shadow-sm">
@@ -37,9 +37,9 @@
         <input type="text" id="productSearch" class="form-control form-control-sm" placeholder="Search product to add..." autocomplete="off">
         <div id="searchResults" class="product-search-results" style="display:none;"></div>
       </div>
-      <table class="table table-sm"><thead><tr><th>Product</th><th style="width:120px">Qty</th><th style="width:140px">Unit Price</th><th style="width:100px">Amount</th><th style="width:50px"></th></tr></thead>
+      <table class="table table-sm"><thead><tr><th>Product</th><th style="width:100px">Qty</th><th style="width:120px">Unit Price</th><th style="width:130px" class="th-expiry">Expiry Date</th><th style="width:100px">Amount</th><th style="width:50px"></th></tr></thead>
         <tbody id="itemsBody"></tbody>
-        <tfoot><tr><td colspan="3" class="text-end fw-bold">Total:</td><td class="fw-bold" id="grandTotal">0.00</td><td></td></tr></tfoot>
+        <tfoot><tr><td colspan="4" class="text-end fw-bold">Total:</td><td class="fw-bold" id="grandTotal">0.00</td><td></td></tr></tfoot>
       </table>
       <button type="submit" class="btn btn-primary">Create Purchase</button>
       <a href="{{ url_for('purchase.list_purchases') }}" class="btn btn-outline-secondary ms-2">Cancel</a>

@@ -1,11 +1,13 @@
 """자체 판매 관리 비즈니스 로직 (비POS 사용자용)"""
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from app.db import fetch_one, fetch_all, insert, execute
 from app.controllers.inventory_controller import process_stock_out
 
 
-def load_sales(business_id: int, status: str = "") -> List[Dict]:
-    """판매 목록을 조회합니다."""
+def load_sales(business_id: int, status: str = "",
+               date_from: str = "", date_to: str = "",
+               store_id: int = None) -> List[Dict]:
+    """판매 목록을 조회합니다 (날짜/상태/매장 필터 지원)."""
     sql = (
         "SELECT sa.*, st.name AS store_name, u.name AS created_by_name "
         "FROM stk_sales sa "
@@ -14,11 +16,75 @@ def load_sales(business_id: int, status: str = "") -> List[Dict]:
         "WHERE sa.business_id = %s"
     )
     params: list = [business_id]
+    if store_id:
+        sql += " AND sa.store_id = %s"
+        params.append(store_id)
     if status:
         sql += " AND sa.status = %s"
         params.append(status)
+    if date_from:
+        sql += " AND sa.sale_date >= %s"
+        params.append(date_from)
+    if date_to:
+        sql += " AND sa.sale_date <= %s"
+        params.append(date_to)
     sql += " ORDER BY sa.sale_date DESC, sa.id DESC"
     return fetch_all(sql, tuple(params))
+
+
+def load_sales_summary(business_id: int, date_from: str = "",
+                       date_to: str = "", store_id: int = None) -> Dict:
+    """기간별 판매 정산 요약을 조회합니다 (매장별 필터 지원)."""
+    where = "WHERE sa.business_id = %s"
+    params: list = [business_id]
+    if store_id:
+        where += " AND sa.store_id = %s"
+        params.append(store_id)
+    if date_from:
+        where += " AND sa.sale_date >= %s"
+        params.append(date_from)
+    if date_to:
+        where += " AND sa.sale_date <= %s"
+        params.append(date_to)
+    row = fetch_one(
+        f"SELECT "
+        f"COUNT(*) AS total_count, "
+        f"COALESCE(SUM(sa.total_amount), 0) AS total_amount, "
+        f"SUM(CASE WHEN sa.status='confirmed' THEN 1 ELSE 0 END) AS confirmed_count, "
+        f"COALESCE(SUM(CASE WHEN sa.status='confirmed' THEN sa.total_amount ELSE 0 END), 0) AS confirmed_amount, "
+        f"SUM(CASE WHEN sa.status='draft' THEN 1 ELSE 0 END) AS draft_count, "
+        f"COALESCE(SUM(CASE WHEN sa.status='draft' THEN sa.total_amount ELSE 0 END), 0) AS draft_amount, "
+        f"SUM(CASE WHEN sa.status='cancelled' THEN 1 ELSE 0 END) AS cancelled_count "
+        f"FROM stk_sales sa {where}",
+        tuple(params),
+    )
+    return row or {}
+
+
+def load_daily_settlement(business_id: int, date_from: str = "",
+                          date_to: str = "", store_id: int = None) -> List[Dict]:
+    """일별 정산 내역을 조회합니다 (매장별 필터 지원)."""
+    where = "WHERE sa.business_id = %s AND sa.status != 'cancelled'"
+    params: list = [business_id]
+    if store_id:
+        where += " AND sa.store_id = %s"
+        params.append(store_id)
+    if date_from:
+        where += " AND sa.sale_date >= %s"
+        params.append(date_from)
+    if date_to:
+        where += " AND sa.sale_date <= %s"
+        params.append(date_to)
+    return fetch_all(
+        f"SELECT sa.sale_date, "
+        f"COUNT(*) AS sale_count, "
+        f"COALESCE(SUM(sa.total_amount), 0) AS day_total, "
+        f"SUM(CASE WHEN sa.status='confirmed' THEN 1 ELSE 0 END) AS confirmed, "
+        f"SUM(CASE WHEN sa.status='draft' THEN 1 ELSE 0 END) AS draft "
+        f"FROM stk_sales sa {where} "
+        f"GROUP BY sa.sale_date ORDER BY sa.sale_date DESC",
+        tuple(params),
+    )
 
 
 def load_sale(sale_id: int) -> Optional[Dict]:
@@ -74,6 +140,82 @@ def confirm_sale(sale_id: int, user_id: Optional[int] = None) -> bool:
 def cancel_sale(sale_id: int) -> int:
     """판매를 취소합니다."""
     return execute("UPDATE stk_sales SET status = 'cancelled' WHERE id = %s", (sale_id,))
+
+
+def resolve_sales_items(rows: List[Dict], business_id: int) -> Tuple[List[Dict], List[str]]:
+    """엑셀 파싱 결과를 product_id로 해석하고, 날짜+고객+메모 기준 그룹핑합니다."""
+    errors: List[str] = []
+    resolved: List[Dict] = []
+    for i, row in enumerate(rows):
+        product = fetch_one(
+            "SELECT id, name, sell_price, unit FROM stk_products WHERE code = %s AND business_id = %s",
+            (row["product_code"], business_id),
+        )
+        if not product:
+            errors.append(f"Row {i+2}: Product code '{row['product_code']}' not found")
+            continue
+        price = row["unit_price"] if row["unit_price"] > 0 else float(product["sell_price"])
+        resolved.append({
+            "sale_date": row["sale_date"],
+            "customer_name": row["customer_name"],
+            "product_code": row["product_code"],
+            "product_name": product["name"],
+            "product_id": product["id"],
+            "quantity": row["quantity"],
+            "unit_price": price,
+            "unit": product["unit"],
+            "amount": row["quantity"] * price,
+            "memo": row["memo"],
+        })
+    return resolved, errors
+
+
+def group_sales_from_rows(resolved_rows: List[Dict]) -> List[Dict]:
+    """해석된 행들을 날짜+고객명+메모 기준으로 판매 단위로 그룹핑합니다."""
+    groups: Dict[str, Dict] = {}
+    for row in resolved_rows:
+        key = f"{row['sale_date']}|{row['customer_name']}|{row['memo']}"
+        if key not in groups:
+            groups[key] = {
+                "sale_date": row["sale_date"],
+                "customer_name": row["customer_name"],
+                "memo": row["memo"],
+                "line_items": [],
+                "total_amount": 0.0,
+            }
+        groups[key]["line_items"].append(row)
+        groups[key]["total_amount"] += row["amount"]
+    return list(groups.values())
+
+
+def batch_create_sales(grouped_sales: List[Dict], business_id: int,
+                       store_id: int, user_id: int,
+                       auto_confirm: bool = False) -> Tuple[List[int], List[str]]:
+    """그룹핑된 판매를 일괄 생성합니다. auto_confirm=True이면 FEFO로 재고 차감."""
+    created_ids: List[int] = []
+    errors: List[str] = []
+    for sale_group in grouped_sales:
+        data = {
+            "business_id": business_id,
+            "store_id": store_id,
+            "sale_date": sale_group["sale_date"],
+            "customer_name": sale_group["customer_name"],
+            "memo": sale_group.get("memo", "") + " [Excel Upload]",
+            "created_by": user_id,
+        }
+        items = [
+            {"product_id": item["product_id"], "quantity": item["quantity"], "unit_price": item["unit_price"]}
+            for item in sale_group["line_items"]
+        ]
+        try:
+            sale_id = save_sale(data, items)
+            if auto_confirm:
+                confirm_sale(sale_id, user_id)
+            created_ids.append(sale_id)
+            print(f"판매 일괄 생성: sale_id={sale_id}, items={len(items)}, confirm={auto_confirm}")
+        except Exception as e:
+            errors.append(f"Sale '{sale_group['customer_name']}' ({sale_group['sale_date']}): {str(e)}")
+    return created_ids, errors
 
 
 def _save_sale_items(sale_id: int, items: List[Dict]) -> float:

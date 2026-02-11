@@ -2,17 +2,59 @@
 {% block title %}New Stock Count{% endblock %}
 {% block page_title %}New Stock Count{% endblock %}
 {% block content %}
-<div class="card border-0 shadow-sm" style="max-width:500px;">
+<div class="card border-0 shadow-sm" style="max-width:600px;">
   <div class="card-body">
+    {% if is_restaurant %}
+    <!-- 식당: 전체 상품 한번에 실사 -->
+    <div class="alert alert-info mb-3">
+      <i class="bi bi-info-circle me-1"></i>
+      <strong>Restaurant Mode:</strong> All products will be loaded on a single page for complete inventory count. No items will be missed.
+    </div>
     <form method="post">
-      <div class="mb-3"><label class="form-label">Count Date *</label><input type="date" name="count_date" class="form-control" required></div>
-      <div class="mb-3"><label class="form-label">Category (leave empty for all)</label>
-        <select name="category_id" class="form-select"><option value="">All Categories</option>
-          {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
-      <div class="mb-3"><label class="form-label">Memo</label><textarea name="memo" class="form-control" rows="2"></textarea></div>
-      <button type="submit" class="btn btn-primary">Create & Load Items</button>
+      <input type="hidden" name="mode" value="full">
+      <div class="mb-3">
+        <label class="form-label">Count Date *</label>
+        <input type="date" name="count_date" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Memo</label>
+        <textarea name="memo" class="form-control" rows="2" placeholder="Full inventory count"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-clipboard-check me-1"></i>Start Full Count</button>
       <a href="{{ url_for('stock_count.list_counts') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
     </form>
+    {% else %}
+    <!-- 마트: 카테고리별 실사 -->
+    <div class="alert alert-warning mb-3">
+      <i class="bi bi-exclamation-triangle me-1"></i>
+      <strong>Mart Mode:</strong> Count by category. Check
+      <a href="{{ url_for('stock_count.coverage_report') }}">Coverage Report</a>
+      to see uncounted categories.
+    </div>
+    <form method="post">
+      <input type="hidden" name="mode" value="category">
+      <div class="mb-3">
+        <label class="form-label">Count Date *</label>
+        <input type="date" name="count_date" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Category *</label>
+        <select name="category_id" class="form-select" required>
+          <option value="">-- Select Category --</option>
+          {% for c in categories %}
+          <option value="{{ c.id }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+        <small class="text-muted">Select a specific category to count. Use Coverage Report to track progress.</small>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Memo</label>
+        <textarea name="memo" class="form-control" rows="2"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-clipboard-check me-1"></i>Create & Load Items</button>
+      <a href="{{ url_for('stock_count.list_counts') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+    </form>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

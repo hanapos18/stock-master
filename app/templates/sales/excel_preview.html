@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Sales Upload Preview{% endblock %}
+{% block page_title %}Sales Upload Preview{% endblock %}
+{% block content %}
+<!-- 요약 카드 -->
+<div class="row mb-4">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm bg-primary bg-opacity-10">
+      <div class="card-body text-center">
+        <h6 class="text-muted">Sales to Create</h6>
+        <h3 class="text-primary fw-bold">{{ total_sales }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center">
+        <h6 class="text-muted">Total Items</h6>
+        <h3 class="fw-bold">{{ total_items }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center">
+        <h6 class="text-muted">Total Amount</h6>
+        <h3 class="fw-bold">{{ grouped_sales|sum(attribute='total_amount')|fmt_price }}</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 그룹별 미리보기 -->
+{% for sale in grouped_sales %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <div>
+      <strong><i class="bi bi-receipt me-1"></i>Sale #{{ loop.index }}</strong>
+      <span class="ms-2 text-muted">{{ sale.sale_date }}</span>
+      {% if sale.customer_name %}<span class="ms-2 badge bg-light text-dark">{{ sale.customer_name }}</span>{% endif %}
+      {% if sale.memo %}<span class="ms-2 text-muted small">{{ sale.memo }}</span>{% endif %}
+    </div>
+    <strong class="text-primary">{{ sale.total_amount|fmt_price }}</strong>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0"><thead class="table-light"><tr>
+      <th>Code</th><th>Product</th><th>Unit</th><th class="text-end">Qty</th><th class="text-end">Price</th><th class="text-end">Amount</th>
+    </tr></thead><tbody>
+      {% for item in sale.line_items %}<tr>
+        <td><code>{{ item.product_code }}</code></td>
+        <td>{{ item.product_name }}</td>
+        <td>{{ item.unit }}</td>
+        <td class="text-end">{{ item.quantity|fmt_qty }}</td>
+        <td class="text-end">{{ item.unit_price|fmt_price }}</td>
+        <td class="text-end">{{ item.amount|fmt_price }}</td>
+      </tr>{% endfor %}
+    </tbody></table>
+  </div>
+</div>
+{% endfor %}
+
+<!-- 처리 폼 -->
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <h6><i class="bi bi-gear me-2"></i>Processing Options</h6>
+    <form method="post" action="{{ url_for('sales.process_sales_excel') }}">
+      <input type="hidden" name="grouped_data" value="{{ grouped_json|e }}">
+      <div class="row align-items-end">
+        <div class="col-md-8">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="radio" name="auto_confirm" value="0" id="optDraft" checked>
+            <label class="form-check-label" for="optDraft">
+              <strong>Create as Draft</strong> — Review each sale before confirming
+            </label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="radio" name="auto_confirm" value="1" id="optConfirm">
+            <label class="form-check-label" for="optConfirm">
+              <strong>Confirm All (FEFO)</strong> — Create and auto-deduct inventory using FEFO
+            </label>
+          </div>
+        </div>
+        <div class="col-md-4 text-end">
+          <a href="{{ url_for('sales.upload_sales_excel') }}" class="btn btn-outline-secondary me-2">Cancel</a>
+          <button type="submit" class="btn btn-primary" onclick="return confirm('Process {{ total_sales }} sale(s)?')">
+            <i class="bi bi-check-circle me-1"></i>Process {{ total_sales }} Sale(s)
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

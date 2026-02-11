@@ -1,46 +1,132 @@
 {% extends "base.html" %}
-{% block title %}Stock Out - StockMaster{% endblock %}
+{% block title %}Stock Out - Hana StockMaster{% endblock %}
 {% block page_title %}Stock Out{% endblock %}
 {% block content %}
-<div class="card border-0 shadow-sm" style="max-width:600px;">
+<style>
+.lot-row { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 10px 14px; margin-bottom: 6px; }
+.lot-row.lot-expired { border-left: 4px solid #dc3545; }
+.lot-row.lot-warning { border-left: 4px solid #ffc107; }
+.lot-row.lot-ok { border-left: 4px solid #28a745; }
+.lot-row.lot-none { border-left: 4px solid #6c757d; }
+</style>
+
+<div class="card border-0 shadow-sm" style="max-width:700px;">
   <div class="card-body">
-    <form method="post">
+    <form method="post" id="stockOutForm">
+      <!-- Product Search -->
       <div class="mb-3 position-relative">
         <label class="form-label">Product *</label>
         <input type="text" id="productSearch" class="form-control" placeholder="Search product..." autocomplete="off">
         <div id="searchResults" class="product-search-results" style="display:none;"></div>
-        <input type="hidden" name="product_id" id="selectedProductId" required>
-        <div id="selectedProduct" class="mt-2 text-danger fw-bold"></div>
+        <input type="hidden" id="selectedProductId">
+        <div id="selectedProduct" class="mt-2 fw-bold text-primary"></div>
       </div>
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label">Quantity *</label>
-          <input type="number" name="quantity" class="form-control" step="0.01" min="0.01" required>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Location</label>
-          <select name="location" class="form-select">
-            {% for k,v in locations.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="col-12">
-          <label class="form-label">Reason *</label>
-          <input type="text" name="reason" class="form-control" required placeholder="Usage, transfer, etc.">
+
+      <!-- Lot Selection (appears after product selected) -->
+      <div id="lotSection" style="display:none;">
+        <label class="form-label"><strong>Select Lots to Deduct</strong></label>
+        <div id="lotContainer"></div>
+        <div class="mt-2 p-2 bg-light rounded d-flex justify-content-between">
+          <span>Total Deduction:</span>
+          <strong id="totalDeduction">0</strong>
         </div>
       </div>
+
+      <!-- Reason -->
       <div class="mt-3">
-        <button type="submit" class="btn btn-danger">Process Stock Out</button>
+        <label class="form-label">Reason *</label>
+        <input type="text" name="reason" class="form-control" required placeholder="Usage, transfer, expired, etc.">
+      </div>
+
+      <div class="mt-3">
+        <button type="submit" class="btn btn-danger" id="submitBtn" disabled>Process Stock Out</button>
         <a href="{{ url_for('inventory.list_inventory') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
       </div>
     </form>
   </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
+var selectedProductId = null;
+
 initProductSearch('productSearch', 'searchResults', function(p) {
+  selectedProductId = p.id;
   document.getElementById('selectedProductId').value = p.id;
   document.getElementById('selectedProduct').textContent = p.code + ' - ' + p.name + ' (' + p.unit + ')';
+  loadLots(p.id);
+});
+
+function loadLots(productId) {
+  fetch('/inventory/api/lots/' + productId)
+    .then(function(r) { return r.json(); })
+    .then(function(lots) {
+      var container = document.getElementById('lotContainer');
+      container.innerHTML = '';
+      if (lots.length === 0) {
+        container.innerHTML = '<div class="text-muted text-center py-3">No stock available for this product</div>';
+        document.getElementById('lotSection').style.display = 'block';
+        return;
+      }
+      lots.forEach(function(lot) {
+        var statusClass = 'lot-none';
+        var expiryLabel = '<span class="text-muted">No expiry</span>';
+        if (lot.expiry_date) {
+          if (lot.days_left < 0) {
+            statusClass = 'lot-expired';
+            expiryLabel = '<span class="badge bg-danger">Expired (' + lot.expiry_date + ')</span>';
+          } else if (lot.days_left <= 7) {
+            statusClass = 'lot-warning';
+            expiryLabel = '<span class="badge bg-warning text-dark">' + lot.days_left + 'd (' + lot.expiry_date + ')</span>';
+          } else if (lot.days_left <= 30) {
+            statusClass = 'lot-warning';
+            expiryLabel = '<span class="badge bg-info text-dark">' + lot.days_left + 'd (' + lot.expiry_date + ')</span>';
+          } else {
+            statusClass = 'lot-ok';
+            expiryLabel = '<span class="text-success">' + lot.expiry_date + ' (' + lot.days_left + 'd)</span>';
+          }
+        }
+        var row = document.createElement('div');
+        row.className = 'lot-row ' + statusClass;
+        row.innerHTML =
+          '<div class="d-flex justify-content-between align-items-center">' +
+            '<div>' +
+              '<span class="me-3">Loc: <strong>' + lot.location + '</strong></span>' +
+              expiryLabel +
+              '<span class="ms-3">Available: <strong>' + lot.quantity + '</strong></span>' +
+            '</div>' +
+            '<div style="width:130px;">' +
+              '<input type="hidden" name="lot_id[]" value="' + lot.id + '">' +
+              '<input type="number" name="lot_qty[]" class="form-control form-control-sm lot-qty-input" ' +
+                'value="0" min="0" max="' + lot.quantity + '" step="0.01" ' +
+                'onchange="updateTotal()" oninput="updateTotal()">' +
+            '</div>' +
+          '</div>';
+        container.appendChild(row);
+      });
+      document.getElementById('lotSection').style.display = 'block';
+    });
+}
+
+function updateTotal() {
+  var total = 0;
+  document.querySelectorAll('.lot-qty-input').forEach(function(input) {
+    total += parseFloat(input.value) || 0;
+  });
+  document.getElementById('totalDeduction').textContent = total.toFixed(2);
+  document.getElementById('submitBtn').disabled = total <= 0;
+}
+
+document.getElementById('stockOutForm').addEventListener('submit', function(e) {
+  var total = 0;
+  document.querySelectorAll('.lot-qty-input').forEach(function(input) {
+    total += parseFloat(input.value) || 0;
+  });
+  if (total <= 0) {
+    e.preventDefault();
+    alert('Please enter quantity for at least one lot.');
+  }
 });
 </script>
 {% endblock %}

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Receipt Preview - {{ sale.sale_number }}{% endblock %}
+{% block page_title %}Receipt Preview{% endblock %}
+{% block content %}
+<div class="row">
+  <!-- 영수증 미리보기 -->
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-receipt me-2"></i>Receipt Preview ({{ printer_width }} chars)</h6>
+        <span class="badge bg-{{ 'success' if printer_ip else 'danger' }}">
+          {{ 'Printer: ' + printer_ip if printer_ip else 'No Printer Configured' }}
+        </span>
+      </div>
+      <div class="card-body p-0">
+        <pre style="font-family: 'Courier New', monospace; font-size: 13px; background: #fff; padding: 16px; margin: 0; white-space: pre; overflow-x: auto; border: 2px dashed #ddd; line-height: 1.4;">{{ preview_text }}</pre>
+      </div>
+    </div>
+  </div>
+  <!-- 제어 패널 -->
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-gear me-2"></i>Printer Control</h6></div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label text-muted small">Printer IP</label>
+          <p class="fw-bold">{{ printer_ip or 'Not configured (set PRINTER_IP in .env)' }}</p>
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-muted small">Paper Width</label>
+          <p class="fw-bold">{{ printer_width }} characters</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-outline-secondary" id="btnTestConn" onclick="testConnection()">
+            <i class="bi bi-wifi me-1"></i>Test Connection
+          </button>
+          <button class="btn btn-outline-primary" id="btnTestPrint" onclick="testPrint()">
+            <i class="bi bi-printer me-1"></i>Test Page
+          </button>
+          <button class="btn btn-success" id="btnPrint" onclick="printReceipt()" {{ 'disabled' if not printer_ip }}>
+            <i class="bi bi-printer-fill me-1"></i>Print Receipt
+          </button>
+        </div>
+        <div id="printResult" class="mt-3" style="display:none"></div>
+      </div>
+    </div>
+    <!-- 판매 정보 요약 -->
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Sale Info</h6></div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tr><td class="text-muted">Number</td><td>{{ sale.sale_number }}</td></tr>
+          <tr><td class="text-muted">Date</td><td>{{ sale.sale_date }}</td></tr>
+          <tr><td class="text-muted">Customer</td><td>{{ sale.customer_name or '-' }}</td></tr>
+          <tr><td class="text-muted">Items</td><td>{{ sale.line_items|length }}</td></tr>
+          <tr><td class="text-muted">Total</td><td class="fw-bold">{{ sale.total_amount|fmt_price }}</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="mt-3">
+      <a href="{{ url_for('sales.view_sale', sale_id=sale.id) }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Sale</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function showResult(success, message) {
+  const el = document.getElementById('printResult');
+  el.style.display = '';
+  el.className = 'mt-3 alert alert-' + (success ? 'success' : 'danger');
+  el.innerHTML = '<i class="bi bi-' + (success ? 'check-circle' : 'exclamation-triangle') + ' me-1"></i>' + message;
+}
+function testConnection() {
+  const btn = document.getElementById('btnTestConn');
+  btn.disabled = true;
+  fetch('{{ url_for("sales.test_printer_connection") }}', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => { btn.disabled = false; showResult(data.success, data.message); })
+    .catch(e => { btn.disabled = false; showResult(false, e.message); });
+}
+function testPrint() {
+  const btn = document.getElementById('btnTestPrint');
+  btn.disabled = true;
+  fetch('{{ url_for("sales.test_printer") }}', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => { btn.disabled = false; showResult(data.success, data.message); })
+    .catch(e => { btn.disabled = false; showResult(false, e.message); });
+}
+function printReceipt() {
+  const btn = document.getElementById('btnPrint');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Printing...';
+  fetch('{{ url_for("sales.print_receipt", sale_id=sale.id) }}', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-printer-fill me-1"></i>Print Receipt';
+      showResult(data.success, data.message);
+    })
+    .catch(e => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-printer-fill me-1"></i>Print Receipt';
+      showResult(false, e.message);
+    });
+}
+</script>
+{% endblock %}

@@ -77,8 +77,22 @@ def load_transaction_summary(business_id: int, start_date: str, end_date: str) -
     return {row["type"]: {"count": row["count"], "total": float(row["total"])} for row in rows}
 
 
-def load_low_stock_products(business_id: int) -> List[Dict]:
-    """최소 재고 이하 상품 목록을 조회합니다."""
+def load_low_stock_products(business_id: int, store_id: int = None) -> List[Dict]:
+    """최소 재고 이하 상품 목록을 조회합니다 (매장별 필터 지원)."""
+    if store_id:
+        return fetch_all(
+            "SELECT p.code, p.name, p.unit, p.min_stock, "
+            "COALESCE(SUM(i.quantity), 0) AS current_stock, "
+            "s.name AS store_name "
+            "FROM stk_products p "
+            "LEFT JOIN stk_inventory i ON p.id = i.product_id AND i.store_id = %s "
+            "LEFT JOIN stk_stores s ON i.store_id = s.id "
+            "WHERE p.business_id = %s AND p.is_active = 1 AND p.min_stock > 0 "
+            "GROUP BY p.id "
+            "HAVING COALESCE(SUM(i.quantity), 0) <= p.min_stock "
+            "ORDER BY COALESCE(SUM(i.quantity), 0) / p.min_stock ASC",
+            (store_id, business_id),
+        )
     return fetch_all(
         "SELECT p.code, p.name, p.unit, p.min_stock, "
         "COALESCE(SUM(i.quantity), 0) AS current_stock, "

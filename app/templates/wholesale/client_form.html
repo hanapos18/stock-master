@@ -32,7 +32,7 @@
           {% for p in client.pricing %}<tr>
             <td>{{ p.product_name }}</td>
             <td>{{ p.discount_type }}</td>
-            <td>{% if p.discount_type=='rate' %}{{ p.discount_rate }}%{% else %}{{ p.fixed_price }}{% endif %}</td>
+            <td>{% if p.discount_type=='rate' %}{{ p.discount_rate|fmt_qty }}%{% else %}{{ p.fixed_price|fmt_price }}{% endif %}</td>
           </tr>{% endfor %}
           {% if not client.pricing %}<tr><td colspan="3" class="text-muted">No custom pricing</td></tr>{% endif %}
         </tbody></table>

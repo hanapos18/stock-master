@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Settlement - Hana StockMaster{% endblock %}
+{% block page_title %}Daily Settlement{% endblock %}
+{% block content %}
+<!-- 날짜 기간 선택 -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label small mb-0">From</label>
+        <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-0">To</label>
+        <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search me-1"></i>Search</button>
+      </div>
+      <div class="col-auto">
+        <a href="{{ url_for('sales.list_sales') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Sales</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 기간 합산 요약 -->
+{% if summary %}
+<div class="row mb-3">
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-primary bg-opacity-10">
+      <div class="card-body py-2 text-center">
+        <small class="text-muted">Period Total Sales</small>
+        <h5 class="fw-bold mb-0">{{ summary.total_count or 0 }} <small>sales</small></h5>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-success bg-opacity-10">
+      <div class="card-body py-2 text-center">
+        <small class="text-muted">Confirmed Amount</small>
+        <h5 class="fw-bold text-success mb-0">{{ summary.confirmed_amount|fmt_price }}</h5>
+        <small class="text-muted">{{ summary.confirmed_count or 0 }} sales</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-warning bg-opacity-10">
+      <div class="card-body py-2 text-center">
+        <small class="text-muted">Draft Amount</small>
+        <h5 class="fw-bold text-warning mb-0">{{ summary.draft_amount|fmt_price }}</h5>
+        <small class="text-muted">{{ summary.draft_count or 0 }} sales</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm border-primary">
+      <div class="card-body py-2 text-center">
+        <small class="text-muted">Period Total Amount</small>
+        <h4 class="fw-bold text-primary mb-0">{{ summary.total_amount|fmt_price }}</h4>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- 일별 정산 테이블 -->
+<div class="card border-0 shadow-sm"><div class="table-responsive">
+  <table class="table table-hover mb-0">
+    <thead class="table-light">
+      <tr>
+        <th>Date</th>
+        <th class="text-center">Sales Count</th>
+        <th class="text-center">Confirmed</th>
+        <th class="text-center">Draft</th>
+        <th class="text-end">Day Total</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% set ns = namespace(running_total=0) %}
+      {% for d in daily %}
+      {% set ns.running_total = ns.running_total + (d.day_total|float) %}
+      <tr>
+        <td class="fw-semibold">{{ d.sale_date }}</td>
+        <td class="text-center">{{ d.sale_count }}</td>
+        <td class="text-center"><span class="badge bg-success">{{ d.confirmed }}</span></td>
+        <td class="text-center">
+          {% if d.draft > 0 %}<span class="badge bg-warning">{{ d.draft }}</span>{% else %}-{% endif %}
+        </td>
+        <td class="text-end fw-bold">{{ d.day_total|fmt_price }}</td>
+        <td>
+          <a href="{{ url_for('sales.list_sales', date_from=d.sale_date, date_to=d.sale_date) }}"
+             class="btn btn-sm btn-outline-primary">View Detail</a>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not daily %}
+      <tr><td colspan="6" class="text-center text-muted py-3">No settlement data found</td></tr>
+      {% endif %}
+    </tbody>
+    {% if daily %}
+    <tfoot class="table-light">
+      <tr class="fw-bold">
+        <td>TOTAL</td>
+        <td class="text-center">{{ daily|sum(attribute='sale_count') }}</td>
+        <td class="text-center">{{ daily|sum(attribute='confirmed') }}</td>
+        <td class="text-center">{{ daily|sum(attribute='draft') }}</td>
+        <td class="text-end text-primary">{{ ns.running_total|fmt_price }}</td>
+        <td></td>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+</div></div>
+{% endblock %}

@@ -8,18 +8,77 @@
       <div class="col-md-3"><strong>Client:</strong> {{ order.client_name }}</div>
       <div class="col-md-3"><strong>Date:</strong> {{ order.order_date }}</div>
       <div class="col-md-3"><strong>Delivery:</strong> {{ order.delivery_date or 'TBD' }}</div>
-      <div class="col-md-3"><strong>Status:</strong> <span class="badge bg-{{ 'success' if order.status=='delivered' else 'info' if order.status=='shipped' else 'warning' }}">{{ order.status }}</span></div>
+      <div class="col-md-3">
+        <strong>Status:</strong>
+        <span class="badge bg-{{ 'success' if order.status=='delivered' else 'info' if order.status=='shipped' else 'warning' }}">{{ order.status }}</span>
+        {% if order.payment_status == 'paid' %}
+        <span class="badge bg-success ms-1">Paid</span>
+        {% elif order.payment_status == 'partial' %}
+        <span class="badge bg-warning text-dark ms-1">Partial</span>
+        {% else %}
+        <span class="badge bg-danger ms-1">Unpaid</span>
+        {% endif %}
+      </div>
     </div>
+
+    <!-- 주문 상세 테이블 -->
     <table class="table table-sm"><thead class="table-light"><tr><th>Code</th><th>Product</th><th>Qty</th><th>Unit</th><th>Price</th><th>Disc%</th><th>Disc Amt</th><th>Amount</th></tr></thead><tbody>
       {% for i in order.line_items %}<tr>
-        <td><code>{{ i.product_code }}</code></td><td>{{ i.product_name }}</td><td>{{ i.quantity }}</td><td>{{ i.unit }}</td>
-        <td class="text-end">{{ i.unit_price|fmt_price }}</td><td>{{ i.discount_rate }}%</td>
+        <td><code>{{ i.product_code }}</code></td><td>{{ i.product_name }}</td><td>{{ i.quantity|fmt_qty }}</td><td>{{ i.unit }}</td>
+        <td class="text-end">{{ i.unit_price|fmt_price }}</td><td>{{ i.discount_rate|fmt_qty }}%</td>
         <td class="text-end text-danger">-{{ i.discount_amount|fmt_price }}</td><td class="text-end">{{ i.amount|fmt_price }}</td>
       </tr>{% endfor %}
       <tr class="fw-bold"><td colspan="7" class="text-end">Subtotal:</td><td class="text-end">{{ order.total_amount|fmt_price }}</td></tr>
       <tr class="text-danger"><td colspan="7" class="text-end">Discount:</td><td class="text-end">-{{ order.discount_amount|fmt_price }}</td></tr>
       <tr class="fw-bold fs-5"><td colspan="7" class="text-end">Final:</td><td class="text-end">{{ order.final_amount|fmt_price }}</td></tr>
     </tbody></table>
+
+    <!-- 결제 요약 -->
+    <div class="row mt-4 mb-3">
+      <div class="col-md-6">
+        <div class="card bg-light border-0">
+          <div class="card-body py-2">
+            <div class="d-flex justify-content-between"><span>Final Amount:</span><strong>{{ order.final_amount|fmt_price }}</strong></div>
+            <div class="d-flex justify-content-between"><span>Paid Amount:</span><span class="text-success fw-bold">{{ order.paid_amount|fmt_price }}</span></div>
+            <hr class="my-1">
+            <div class="d-flex justify-content-between"><span>Balance Due:</span><span class="text-danger fw-bold fs-5">{{ balance|fmt_price }}</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6 d-flex align-items-end">
+        {% if balance > 0 %}
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#paymentModal"><i class="bi bi-credit-card me-1"></i>Add Payment</button>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- 결제 내역 -->
+    {% if payments %}
+    <h6 class="mt-4"><i class="bi bi-receipt me-1"></i>Payment History</h6>
+    <table class="table table-sm table-bordered"><thead class="table-light"><tr>
+      <th>Date</th><th>Method</th><th>Amount</th><th>Check#/Bank</th><th>Memo</th><th>By</th>
+    </tr></thead><tbody>
+      {% for p in payments %}<tr>
+        <td>{{ p.paid_at }}</td>
+        <td>
+          {% if p.payment_method == 'cash' %}<span class="badge bg-success">Cash</span>
+          {% elif p.payment_method == 'check' %}<span class="badge bg-info">Check</span>
+          {% elif p.payment_method == 'bank_transfer' %}<span class="badge bg-primary">Bank Transfer</span>
+          {% else %}<span class="badge bg-secondary">{{ p.payment_method }}</span>{% endif %}
+        </td>
+        <td class="text-end">{{ p.amount|fmt_price }}</td>
+        <td>
+          {% if p.payment_method == 'check' %}#{{ p.check_number or '-' }} ({{ p.check_date or '-' }})
+          {% elif p.payment_method == 'bank_transfer' %}{{ p.bank_name or '' }} {{ p.bank_ref or '' }}
+          {% else %}-{% endif %}
+        </td>
+        <td>{{ p.memo or '' }}</td>
+        <td>{{ p.paid_by_name or '' }}</td>
+      </tr>{% endfor %}
+    </tbody></table>
+    {% endif %}
+
+    <!-- 액션 버튼 -->
     <div class="mt-3">
       {% if order.status in ('draft','confirmed') %}
       <form method="post" action="{{ url_for('wholesale.ship_order', order_id=order.id) }}" class="d-inline">
@@ -30,4 +89,72 @@
     </div>
   </div>
 </div>
+
+<!-- 결제 등록 모달 -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('wholesale.pay_order', order_id=order.id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Payment for {{ order.order_number }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3 bg-light p-2 rounded">
+            <small>Balance: <strong class="text-danger">{{ balance|fmt_price }}</strong></small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Payment Method</label>
+            <select name="payment_method" id="payMethod" class="form-select" required onchange="togglePayFields()">
+              <option value="cash">Cash</option>
+              <option value="check">Check</option>
+              <option value="bank_transfer">Bank Transfer</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Amount</label>
+            <input type="number" name="amount" class="form-control" step="0.01" min="0.01" max="{{ balance }}" value="{{ balance }}" required>
+          </div>
+          <!-- 수표 필드 -->
+          <div id="checkFields" style="display:none">
+            <div class="mb-3">
+              <label class="form-label">Check Number</label>
+              <input type="text" name="check_number" class="form-control">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Check Date (Maturity)</label>
+              <input type="date" name="check_date" class="form-control">
+            </div>
+          </div>
+          <!-- 은행 필드 -->
+          <div id="bankFields" style="display:none">
+            <div class="mb-3">
+              <label class="form-label">Bank Name</label>
+              <input type="text" name="bank_name" class="form-control">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Reference Number</label>
+              <input type="text" name="bank_ref" class="form-control">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Memo</label>
+            <input type="text" name="memo" class="form-control">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Record Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+function togglePayFields() {
+  const m = document.getElementById('payMethod').value;
+  document.getElementById('checkFields').style.display = m === 'check' ? '' : 'none';
+  document.getElementById('bankFields').style.display = m === 'bank_transfer' ? '' : 'none';
+}
+</script>
 {% endblock %}

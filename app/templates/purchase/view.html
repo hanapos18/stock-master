@@ -11,13 +11,15 @@
       <div class="col-md-3"><strong>Status:</strong> <span class="badge bg-{{ 'success' if purchase.status=='received' else 'warning' if purchase.status=='draft' else 'secondary' }}">{{ purchase.status }}</span></div>
     </div>
     {% if purchase.memo %}<p class="text-muted">{{ purchase.memo }}</p>{% endif %}
-    <table class="table table-sm"><thead class="table-light"><tr><th>Code</th><th>Product</th><th>Qty</th><th>Unit</th><th>Price</th><th>Amount</th></tr></thead><tbody>
+    <table class="table table-sm"><thead class="table-light"><tr><th>Code</th><th>Product</th><th>Qty</th><th>Unit</th><th>Price</th><th>Expiry</th><th>Amount</th></tr></thead><tbody>
       {% for item in purchase.line_items %}<tr>
         <td><code>{{ item.product_code }}</code></td><td>{{ item.product_name }}</td>
-        <td>{{ item.quantity }}</td><td>{{ item.unit }}</td>
-        <td class="text-end">{{ item.unit_price|fmt_price }}</td><td class="text-end">{{ item.amount|fmt_price }}</td>
+        <td>{{ item.quantity|fmt_qty }}</td><td>{{ item.unit }}</td>
+        <td class="text-end">{{ item.unit_price|fmt_price }}</td>
+        <td>{% if item.expiry_date %}<span class="badge bg-secondary">{{ item.expiry_date }}</span>{% else %}-{% endif %}</td>
+        <td class="text-end">{{ item.amount|fmt_price }}</td>
       </tr>{% endfor %}
-      <tr class="fw-bold"><td colspan="5" class="text-end">Total:</td><td class="text-end">{{ purchase.total_amount|fmt_price }}</td></tr>
+      <tr class="fw-bold"><td colspan="6" class="text-end">Total:</td><td class="text-end">{{ purchase.total_amount|fmt_price }}</td></tr>
     </tbody></table>
     <!-- Attachments Section -->
     {% if attachments %}

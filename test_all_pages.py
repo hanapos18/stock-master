@@ -1,4 +1,4 @@
-"""StockMaster 전체 페이지 버튼/입력 기능 자동 테스트"""
+"""Hana StockMaster 전체 페이지 버튼/입력 기능 자동 테스트"""
 import requests
 import json
 import sys
@@ -156,7 +156,7 @@ def test_api_endpoint(url: str, page_name: str) -> None:
 # =============================================
 def main():
     log("=" * 60)
-    log("🧪 StockMaster 전체 페이지 자동 테스트 시작")
+    log("🧪 Hana StockMaster 전체 페이지 자동 테스트 시작")
     log("=" * 60)
     log(f"서버: {BASE_URL}")
     log(f"날짜: {date.today().isoformat()}")
@@ -434,7 +434,7 @@ def print_summary():
     """테스트 결과 요약 출력"""
     log("\n")
     log("=" * 70)
-    log("📋 StockMaster 전체 페이지 테스트 결과 요약")
+    log("📋 Hana StockMaster 전체 페이지 테스트 결과 요약")
     log("=" * 70)
     pass_count = sum(1 for r in results if r["status"] == "PASS")
     fail_count = sum(1 for r in results if r["status"] == "FAIL")

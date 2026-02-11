@@ -37,7 +37,7 @@ def load_purchase(purchase_id: int) -> Optional[Dict]:
     )
     if purchase:
         purchase["line_items"] = fetch_all(
-            "SELECT pi.*, pr.name AS product_name, pr.code AS product_code, pr.unit "
+            "SELECT pi.*, pi.expiry_date, pr.name AS product_name, pr.code AS product_code, pr.unit "
             "FROM stk_purchase_items pi "
             "JOIN stk_products pr ON pi.product_id = pr.id "
             "WHERE pi.purchase_id = %s",
@@ -63,16 +63,19 @@ def save_purchase(data: Dict, items: List[Dict]) -> int:
 
 
 def receive_purchase(purchase_id: int, user_id: Optional[int] = None) -> bool:
-    """매입을 입고 처리합니다 (재고에 반영)."""
+    """매입을 입고 처리합니다 (재고에 반영, 유통기한 포함)."""
     purchase = load_purchase(purchase_id)
     if not purchase or purchase["status"] == "received":
         return False
     for item in purchase["line_items"]:
+        expiry = item.get("expiry_date")
+        expiry_str = str(expiry) if expiry else None
         process_stock_in(
             product_id=item["product_id"], store_id=purchase["store_id"],
             quantity=float(item["quantity"]), unit_price=float(item["unit_price"]),
             reason=f"Purchase #{purchase['purchase_number']}",
             user_id=user_id, reference_id=purchase_id, reference_type="purchase",
+            expiry_date=expiry_str,
         )
     execute("UPDATE stk_purchases SET status = 'received' WHERE id = %s", (purchase_id,))
     return True
@@ -84,17 +87,18 @@ def cancel_purchase(purchase_id: int) -> int:
 
 
 def _save_purchase_items(purchase_id: int, items: List[Dict]) -> float:
-    """매입 상세 항목을 저장하고 합계를 반환합니다."""
+    """매입 상세 항목을 저장하고 합계를 반환합니다 (유통기한 포함)."""
     total = 0.0
     for item in items:
         qty = float(item["quantity"])
         price = float(item["unit_price"])
         amount = qty * price
         total += amount
+        expiry = item.get("expiry_date") or None
         insert(
-            "INSERT INTO stk_purchase_items (purchase_id, product_id, quantity, unit_price, amount) "
-            "VALUES (%s, %s, %s, %s, %s)",
-            (purchase_id, item["product_id"], qty, price, amount),
+            "INSERT INTO stk_purchase_items (purchase_id, product_id, quantity, unit_price, amount, expiry_date) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            (purchase_id, item["product_id"], qty, price, amount, expiry),
         )
     return total
 

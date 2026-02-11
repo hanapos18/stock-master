@@ -1,4 +1,4 @@
-"""StockMaster Flask 앱 팩토리"""
+"""Hana StockMaster Flask 앱 팩토리"""
 from datetime import timedelta
 from flask import Flask
 from app.db import init_db
@@ -40,6 +40,9 @@ def _register_blueprints(application: Flask) -> None:
     from app.routes.report_routes import report_bp
     from app.routes.help_routes import help_bp
     from app.routes.attachment_routes import attachment_bp
+    from app.routes.pos_sync_routes import pos_sync_bp
+    from app.routes.transfer_routes import transfer_bp
+    from app.routes.user_routes import user_bp
     application.register_blueprint(auth_bp)
     application.register_blueprint(dashboard_bp)
     application.register_blueprint(business_bp)
@@ -56,17 +59,27 @@ def _register_blueprints(application: Flask) -> None:
     application.register_blueprint(report_bp)
     application.register_blueprint(help_bp)
     application.register_blueprint(attachment_bp)
+    application.register_blueprint(pos_sync_bp)
+    application.register_blueprint(transfer_bp)
+    application.register_blueprint(user_bp)
 
 
 def _register_template_filters(application: Flask) -> None:
     """커스텀 Jinja2 필터를 등록합니다."""
     from decimal import Decimal
+    from flask import session
+
+    # 기본 표시 소수점 자리수 (추후 사용자 옵션으로 변경 가능)
+    DEFAULT_PRICE_DECIMALS = 2
+    DEFAULT_QTY_DECIMALS = 2
 
     @application.template_filter("fmt_price")
-    def format_price(value, decimals: int = 6) -> str:
+    def format_price(value, decimals: int = 0) -> str:
         """가격을 소수점 최대 decimals 자리까지 표시하고 트레일링 0을 제거합니다."""
         if value is None:
             return "0"
+        if decimals == 0:
+            decimals = session.get("display_price_decimals", DEFAULT_PRICE_DECIMALS)
         num = Decimal(str(value))
         formatted = f"{num:.{decimals}f}"
         if "." in formatted:
@@ -74,10 +87,12 @@ def _register_template_filters(application: Flask) -> None:
         return formatted
 
     @application.template_filter("fmt_qty")
-    def format_quantity(value, decimals: int = 4) -> str:
+    def format_quantity(value, decimals: int = 0) -> str:
         """수량을 소수점 최대 decimals 자리까지 표시하고 트레일링 0을 제거합니다."""
         if value is None:
             return "0"
+        if decimals == 0:
+            decimals = session.get("display_qty_decimals", DEFAULT_QTY_DECIMALS)
         num = Decimal(str(value))
         formatted = f"{num:.{decimals}f}"
         if "." in formatted:

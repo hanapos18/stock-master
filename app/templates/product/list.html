@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Products - StockMaster{% endblock %}
+{% block title %}Products - Hana StockMaster{% endblock %}
 {% block page_title %}Products{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between mb-3">
@@ -41,7 +41,7 @@
           <td>{{ p.unit }}</td>
           <td class="text-end">{{ p.unit_price|fmt_price }}</td>
           <td class="text-end">{{ p.sell_price|fmt_price }}</td>
-          <td>{{ p.min_stock }}</td>
+          <td>{{ p.min_stock|fmt_qty }}</td>
           <td>{{ p.storage_location or '-' }}</td>
           <td>{{ p.supplier_name or '-' }}</td>
           <td>

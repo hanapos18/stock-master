@@ -65,10 +65,13 @@ function addItemRow(tbodyId, product, priceField) {
   const price = priceField === 'sell' ? product.sell_price : product.unit_price;
   const idx = tbody.children.length;
   const row = document.createElement('tr');
+  const hasExpiry = tbody.closest('table').querySelector('th.th-expiry');
+  const expiryCell = hasExpiry ? `<td><input type="date" name="item_expiry_date[]" class="form-control form-control-sm"></td>` : '';
   row.innerHTML = `
     <td><input type="hidden" name="item_product_id[]" value="${product.id}">${product.code} - ${product.name}</td>
     <td><input type="number" name="item_quantity[]" class="form-control form-control-sm" value="1" min="0.01" step="0.01" required onchange="calcRowAmount(this)"></td>
     <td><input type="number" name="item_unit_price[]" class="form-control form-control-sm" value="${price}" min="0" step="0.01" onchange="calcRowAmount(this)"></td>
+    ${expiryCell}
     <td class="row-amount">${price.toFixed(2)}</td>
     <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();calcTotal();">X</button></td>
   `;

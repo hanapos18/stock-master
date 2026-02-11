@@ -3,7 +3,7 @@
 {% block page_title %}Wholesale Orders{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between mb-3">
-  <div class="d-flex gap-2">
+  <div class="d-flex gap-2 flex-wrap">
     <a href="{{ url_for('wholesale.list_orders') }}" class="btn btn-sm {{ 'btn-primary' if not selected_status else 'btn-outline-primary' }}">All</a>
     {% for s in ['draft','confirmed','shipped','delivered','cancelled'] %}
     <a href="{{ url_for('wholesale.list_orders', status=s) }}" class="btn btn-sm {{ 'btn-primary' if selected_status==s else 'btn-outline-primary' }}">{{ s|capitalize }}</a>{% endfor %}
@@ -12,18 +12,23 @@
 </div>
 <div class="card border-0 shadow-sm"><div class="table-responsive">
   <table class="table table-hover mb-0"><thead class="table-light"><tr>
-    <th>Number</th><th>Date</th><th>Client</th><th>Store</th><th>Total</th><th>Disc</th><th>Final</th><th>Status</th><th>Actions</th>
+    <th>Number</th><th>Date</th><th>Client</th><th>Store</th><th>Final</th><th>Paid</th><th>Balance</th><th>Payment</th><th>Status</th><th>Actions</th>
   </tr></thead><tbody>
     {% for o in orders %}<tr>
       <td><a href="{{ url_for('wholesale.view_order', order_id=o.id) }}">{{ o.order_number }}</a></td>
       <td>{{ o.order_date }}</td><td>{{ o.client_name }}</td><td>{{ o.store_name }}</td>
-      <td class="text-end">{{ o.total_amount|fmt_price }}</td>
-      <td class="text-end text-danger">-{{ o.discount_amount|fmt_price }}</td>
       <td class="text-end fw-bold">{{ o.final_amount|fmt_price }}</td>
+      <td class="text-end text-success">{{ o.paid_amount|fmt_price }}</td>
+      <td class="text-end text-danger">{{ (o.final_amount|float - o.paid_amount|float)|fmt_price }}</td>
+      <td>
+        {% if o.payment_status == 'paid' %}<span class="badge bg-success">Paid</span>
+        {% elif o.payment_status == 'partial' %}<span class="badge bg-warning text-dark">Partial</span>
+        {% else %}<span class="badge bg-danger">Unpaid</span>{% endif %}
+      </td>
       <td><span class="badge bg-{{ 'success' if o.status=='delivered' else 'info' if o.status=='shipped' else 'warning' if o.status=='draft' else 'secondary' }}">{{ o.status }}</span></td>
       <td><a href="{{ url_for('wholesale.view_order', order_id=o.id) }}" class="btn btn-sm btn-outline-primary">View</a></td>
     </tr>{% endfor %}
-    {% if not orders %}<tr><td colspan="9" class="text-center text-muted py-3">No orders</td></tr>{% endif %}
+    {% if not orders %}<tr><td colspan="10" class="text-center text-muted py-3">No orders</td></tr>{% endif %}
   </tbody></table>
 </div></div>
 {% endblock %}

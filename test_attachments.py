@@ -1,4 +1,4 @@
-"""StockMaster 첨부파일(영수증 업로드) 기능 자동 테스트"""
+"""Hana StockMaster 첨부파일(영수증 업로드) 기능 자동 테스트"""
 import requests
 import io
 import sys
@@ -42,7 +42,7 @@ def create_test_image() -> io.BytesIO:
 
 def main():
     print("=" * 60)
-    print("🧪 StockMaster 첨부파일 기능 테스트")
+    print("🧪 Hana StockMaster 첨부파일 기능 테스트")
     print("=" * 60)
 
     # 1. 로그인

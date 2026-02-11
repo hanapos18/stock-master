@@ -12,7 +12,9 @@ def list_clients():
     """도매 거래처 목록"""
     business_id = session["business"]["id"]
     clients = wholesale_controller.load_wholesale_clients(business_id)
-    return render_template("wholesale/clients.html", clients=clients)
+    client_balances = wholesale_controller.load_client_balances(business_id)
+    balance_map = {b["id"]: float(b["balance"]) for b in client_balances}
+    return render_template("wholesale/clients.html", clients=clients, balance_map=balance_map)
 
 
 @wholesale_bp.route("/clients/create", methods=["GET", "POST"])
@@ -113,7 +115,9 @@ def create_order():
 def view_order(order_id: int):
     """도매 주문 상세 / 배송리스트"""
     order = wholesale_controller.load_wholesale_order(order_id)
-    return render_template("wholesale/order_view.html", order=order)
+    payments = wholesale_controller.load_order_payments(order_id)
+    balance = float(order["final_amount"]) - float(order["paid_amount"]) if order else 0
+    return render_template("wholesale/order_view.html", order=order, payments=payments, balance=balance)
 
 
 @wholesale_bp.route("/orders/<int:order_id>/ship", methods=["POST"])
@@ -126,6 +130,89 @@ def ship_order(order_id: int):
     else:
         flash("Cannot ship this order", "danger")
     return redirect(url_for("wholesale.view_order", order_id=order_id))
+
+
+@wholesale_bp.route("/orders/<int:order_id>/pay", methods=["POST"])
+@login_required
+def pay_order(order_id: int):
+    """도매 주문 결제 등록"""
+    order = wholesale_controller.load_wholesale_order(order_id)
+    if not order:
+        flash("Order not found", "danger")
+        return redirect(url_for("wholesale.list_orders"))
+    data = {
+        "business_id": order["business_id"],
+        "client_id": order["client_id"],
+        "payment_method": request.form["payment_method"],
+        "amount": float(request.form["amount"]),
+        "check_date": request.form.get("check_date") or None,
+        "check_number": request.form.get("check_number") or None,
+        "bank_name": request.form.get("bank_name") or None,
+        "bank_ref": request.form.get("bank_ref") or None,
+        "memo": request.form.get("memo", ""),
+        "paid_by": session["user"]["id"],
+    }
+    wholesale_controller.record_payment(order_id, data)
+    flash("Payment recorded successfully", "success")
+    return redirect(url_for("wholesale.view_order", order_id=order_id))
+
+
+@wholesale_bp.route("/orders/<int:order_id>/payments")
+@login_required
+def api_order_payments(order_id: int):
+    """주문별 결제 내역 (JSON API)"""
+    payments = wholesale_controller.load_order_payments(order_id)
+    result = []
+    for p in payments:
+        result.append({
+            "id": p["id"],
+            "payment_method": p["payment_method"],
+            "amount": float(p["amount"]),
+            "check_date": str(p["check_date"]) if p.get("check_date") else None,
+            "check_number": p.get("check_number"),
+            "bank_name": p.get("bank_name"),
+            "bank_ref": p.get("bank_ref"),
+            "memo": p.get("memo"),
+            "paid_at": str(p["paid_at"]),
+            "paid_by_name": p.get("paid_by_name", ""),
+        })
+    return jsonify(result)
+
+
+@wholesale_bp.route("/balances")
+@login_required
+def balances():
+    """거래처별 미수금 현황"""
+    business_id = session["business"]["id"]
+    client_balances = wholesale_controller.load_client_balances(business_id)
+    check_schedule = wholesale_controller.load_check_schedule(business_id)
+    total_balance = sum(float(c["balance"]) for c in client_balances)
+    return render_template(
+        "wholesale/balances.html",
+        client_balances=client_balances,
+        check_schedule=check_schedule,
+        total_balance=total_balance,
+    )
+
+
+@wholesale_bp.route("/clients/<int:client_id>/statement")
+@login_required
+def client_statement(client_id: int):
+    """거래처 거래명세서"""
+    client = wholesale_controller.load_wholesale_client(client_id)
+    if not client:
+        flash("Client not found", "danger")
+        return redirect(url_for("wholesale.list_clients"))
+    orders = wholesale_controller.load_client_orders_with_balance(client_id)
+    payments = wholesale_controller.load_client_payment_history(client_id)
+    balance_info = wholesale_controller.load_client_balance(client_id)
+    return render_template(
+        "wholesale/client_statement.html",
+        client=client,
+        orders=orders,
+        payments=payments,
+        balance_info=balance_info,
+    )
 
 
 @wholesale_bp.route("/orders/<int:order_id>/print")

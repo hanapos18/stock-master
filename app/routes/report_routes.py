@@ -2,7 +2,7 @@
 from datetime import date, timedelta
 from flask import Blueprint, render_template, request, session, jsonify, send_file
 from app.routes.dashboard_routes import login_required
-from app.controllers import report_controller, business_controller
+from app.controllers import report_controller, business_controller, inventory_controller
 from app.services.excel_service import generate_excel_report
 
 report_bp = Blueprint("report", __name__, url_prefix="/reports")
@@ -67,6 +67,19 @@ def low_stock_report():
     business_id = session["business"]["id"]
     data = report_controller.load_low_stock_products(business_id)
     return render_template("reports/low_stock.html", data=data)
+
+
+@report_bp.route("/expiry")
+@login_required
+def expiry_report():
+    """유통기한 리포트"""
+    business_id = session["business"]["id"]
+    filter_type = request.args.get("filter", "all")
+    data = inventory_controller.load_expiry_report(business_id, filter_type=filter_type)
+    alerts = inventory_controller.load_expiry_alerts(business_id)
+    return render_template("reports/expiry.html", data=data,
+                           filter_type=filter_type, alerts=alerts,
+                           today=date.today())
 
 
 @report_bp.route("/api/export/<report_type>")

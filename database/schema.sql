@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS stk_stores (
     name VARCHAR(100) NOT NULL,
     address TEXT,
     phone VARCHAR(20),
+    is_warehouse TINYINT(1) DEFAULT 0 COMMENT '1=central warehouse',
     is_active TINYINT(1) DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (business_id) REFERENCES stk_businesses(id) ON DELETE CASCADE
@@ -44,9 +45,11 @@ CREATE TABLE IF NOT EXISTS stk_users (
     password_hash VARCHAR(255) NOT NULL,
     name VARCHAR(100) NOT NULL,
     role ENUM('admin','manager','staff') DEFAULT 'staff',
+    store_id INT NULL DEFAULT NULL COMMENT 'NULL=전체매장(본점), 값=소속지점만',
     is_active TINYINT(1) DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (business_id) REFERENCES stk_businesses(id) ON DELETE CASCADE
+    FOREIGN KEY (business_id) REFERENCES stk_businesses(id) ON DELETE CASCADE,
+    FOREIGN KEY (store_id) REFERENCES stk_stores(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ── 카테고리 ──
@@ -121,7 +124,7 @@ CREATE TABLE IF NOT EXISTS stk_transactions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,
     store_id INT NOT NULL,
-    type ENUM('in','out','adjust','discard','move','sale') NOT NULL,
+    type ENUM('in','out','adjust','discard','move','sale','transfer_out','transfer_in') NOT NULL,
     from_location VARCHAR(50),
     to_location VARCHAR(50),
     quantity DECIMAL(10,4) NOT NULL,
@@ -162,6 +165,7 @@ CREATE TABLE IF NOT EXISTS stk_purchase_items (
     quantity DECIMAL(10,4) NOT NULL,
     unit_price DECIMAL(16,6) DEFAULT 0,
     amount DECIMAL(16,6) DEFAULT 0,
+    expiry_date DATE NULL COMMENT 'expiry date for this lot',
     FOREIGN KEY (purchase_id) REFERENCES stk_purchases(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES stk_products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
@@ -258,6 +262,8 @@ CREATE TABLE IF NOT EXISTS stk_wholesale_orders (
     total_amount DECIMAL(16,6) DEFAULT 0,
     discount_amount DECIMAL(16,6) DEFAULT 0,
     final_amount DECIMAL(16,6) DEFAULT 0,
+    paid_amount DECIMAL(16,6) DEFAULT 0 COMMENT 'total paid so far',
+    payment_status ENUM('unpaid','partial','paid') DEFAULT 'unpaid',
     memo TEXT,
     created_by INT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -278,6 +284,26 @@ CREATE TABLE IF NOT EXISTS stk_wholesale_order_items (
     amount DECIMAL(16,6) DEFAULT 0,
     FOREIGN KEY (order_id) REFERENCES stk_wholesale_orders(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES stk_products(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ── 도매 결제 내역 ──
+CREATE TABLE IF NOT EXISTS stk_wholesale_payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    business_id INT NOT NULL,
+    client_id INT NOT NULL,
+    payment_method ENUM('cash','check','bank_transfer','credit') NOT NULL,
+    amount DECIMAL(16,6) NOT NULL,
+    check_date DATE NULL COMMENT 'check maturity date',
+    check_number VARCHAR(50) NULL,
+    bank_name VARCHAR(50) NULL,
+    bank_ref VARCHAR(100) NULL COMMENT 'bank transfer reference',
+    memo TEXT,
+    paid_by INT NULL,
+    paid_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES stk_wholesale_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (business_id) REFERENCES stk_businesses(id),
+    FOREIGN KEY (client_id) REFERENCES stk_wholesale_clients(id)
 ) ENGINE=InnoDB;
 
 -- ── 실사 재고 보고 ──
@@ -335,6 +361,38 @@ CREATE TABLE IF NOT EXISTS stk_sale_items (
     amount DECIMAL(16,6) DEFAULT 0,
     FOREIGN KEY (sale_id) REFERENCES stk_sales(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES stk_products(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ── 매장 간 이동 (Inter-Store Transfer) ──
+CREATE TABLE IF NOT EXISTS stk_transfers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    business_id INT NOT NULL,
+    from_store_id INT NOT NULL,
+    to_store_id INT NOT NULL,
+    status ENUM('pending','shipped','received','cancelled') DEFAULT 'pending',
+    requested_by INT NULL,
+    shipped_by INT NULL,
+    received_by INT NULL,
+    shipped_at DATETIME NULL,
+    received_at DATETIME NULL,
+    memo TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (business_id) REFERENCES stk_businesses(id),
+    FOREIGN KEY (from_store_id) REFERENCES stk_stores(id),
+    FOREIGN KEY (to_store_id) REFERENCES stk_stores(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS stk_transfer_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    transfer_id INT NOT NULL,
+    product_id INT NOT NULL,
+    inventory_id INT NULL COMMENT 'source lot inventory ID',
+    quantity DECIMAL(10,4) NOT NULL,
+    received_quantity DECIMAL(10,4) NULL COMMENT 'actual received qty',
+    expiry_date DATE NULL,
+    location VARCHAR(50) DEFAULT 'warehouse',
+    FOREIGN KEY (transfer_id) REFERENCES stk_transfers(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES stk_products(id)
 ) ENGINE=InnoDB;
 
 -- ── 첨부파일 (영수증/배송원장 등) ──

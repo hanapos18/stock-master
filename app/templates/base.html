@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}StockMaster{% endblock %}</title>
+  <title>{% block title %}Hana StockMaster{% endblock %}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
@@ -14,7 +14,7 @@
     <!-- Sidebar -->
     <div class="sidebar bg-dark text-white" id="sidebar">
       <div class="sidebar-header px-3 py-3 border-bottom border-secondary">
-        <h5 class="mb-0"><i class="bi bi-box-seam"></i> StockMaster</h5>
+        <h5 class="mb-0"><i class="bi bi-box-seam"></i> Hana StockMaster</h5>
         {% if current_business %}
         <small class="text-muted">{{ current_business.name }}</small>
         {% endif %}
@@ -44,15 +44,19 @@
           <i class="bi bi-people me-2"></i>Wholesale Clients</a>
         <a class="nav-link text-white" href="{{ url_for('wholesale.list_orders') }}">
           <i class="bi bi-receipt me-2"></i>Wholesale Orders</a>
+        <a class="nav-link text-white" href="{{ url_for('wholesale.balances') }}">
+          <i class="bi bi-wallet2 me-2"></i>Balances</a>
         {% endif %}
         <a class="nav-link text-white" href="{{ url_for('repackaging.list_rules') }}">
           <i class="bi bi-scissors me-2"></i>Repackaging</a>
-        {% if current_business and not current_business.pos_db_name %}
+        <a class="nav-link text-white" href="{{ url_for('transfer.list_transfers') }}">
+          <i class="bi bi-arrow-left-right me-2"></i>Transfers</a>
         <hr class="border-secondary my-2">
         <small class="text-muted px-3 mb-1">SALES</small>
         <a class="nav-link text-white" href="{{ url_for('sales.list_sales') }}">
           <i class="bi bi-cash-stack me-2"></i>Sales</a>
-        {% endif %}
+        <a class="nav-link text-white" href="{{ url_for('sales.settlement') }}">
+          <i class="bi bi-calculator me-2"></i>Settlement</a>
         <hr class="border-secondary my-2">
         <a class="nav-link text-white" href="{{ url_for('stock_count.list_counts') }}">
           <i class="bi bi-clipboard-check me-2"></i>Stock Count</a>
@@ -61,9 +65,15 @@
           <i class="bi bi-bar-chart me-2"></i>Inventory Report</a>
         <a class="nav-link text-white" href="{{ url_for('report.low_stock_report') }}">
           <i class="bi bi-exclamation-triangle me-2"></i>Low Stock</a>
+        <a class="nav-link text-white" href="{{ url_for('report.expiry_report') }}">
+          <i class="bi bi-calendar-x me-2"></i>Expiry Dates</a>
         <hr class="border-secondary my-2">
         <a class="nav-link text-white" href="{{ url_for('business.list_businesses') }}">
           <i class="bi bi-building me-2"></i>Businesses</a>
+        {% if current_user and current_user.role == 'admin' %}
+        <a class="nav-link text-white" href="{{ url_for('users.list_users') }}">
+          <i class="bi bi-people me-2"></i>Users</a>
+        {% endif %}
         <hr class="border-secondary my-2">
         <a class="nav-link text-white" href="{{ url_for('help.index') }}">
           <i class="bi bi-question-circle me-2"></i>Help / Manual</a>
@@ -77,21 +87,35 @@
           <i class="bi bi-list"></i></button>
         <span class="navbar-brand mb-0">{% block page_title %}{% endblock %}</span>
         <div class="ms-auto d-flex align-items-center gap-3">
-          {% if session.get('stores') and session['stores']|length > 1 %}
+          <!-- 현재 매장 표시 + 매장 전환 (전체 접근 가능한 경우만 드롭다운) -->
+          {% if session.get('is_hq') and session.get('stores') and session['stores']|length > 1 %}
           <div class="dropdown">
             <button class="btn btn-outline-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
               <i class="bi bi-shop"></i> {{ current_store.name if current_store else 'Select Store' }}
             </button>
             <ul class="dropdown-menu">
               {% for s in session.get('stores', []) %}
-              <li><a class="dropdown-item" href="{{ url_for('auth.switch_store', store_id=s.id) }}">{{ s.name }}</a></li>
+              <li><a class="dropdown-item {{ 'active' if current_store and current_store.id == s.id }}" href="{{ url_for('auth.switch_store', store_id=s.id) }}">{{ s.name }}</a></li>
               {% endfor %}
             </ul>
           </div>
+          {% elif current_store %}
+          <span class="badge bg-info text-dark"><i class="bi bi-shop me-1"></i>{{ current_store.name }}</span>
           {% endif %}
+          <!-- 역할 배지 -->
+          {% if current_user %}
           <span class="text-muted small">
-            <i class="bi bi-person-circle"></i> {{ current_user.name if current_user else '' }}
+            <i class="bi bi-person-circle"></i> {{ current_user.name }}
+            {% if current_user.role == 'admin' %}
+            <span class="badge bg-danger ms-1">Admin</span>
+            {% elif current_user.role == 'manager' %}
+            <span class="badge bg-warning text-dark ms-1">Manager</span>
+            {% else %}
+            <span class="badge bg-secondary ms-1">Staff</span>
+            {% endif %}
+            {% if session.get('is_hq') %}<span class="badge bg-primary ms-1">HQ</span>{% endif %}
           </span>
+          {% endif %}
           <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-danger btn-sm">Logout</a>
         </div>
       </nav>

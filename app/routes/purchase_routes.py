@@ -150,16 +150,19 @@ def _flash_purchase_import_result(result: dict) -> None:
 
 
 def _extract_items(form) -> list:
-    """폼에서 매입 항목들을 추출합니다."""
+    """폼에서 매입 항목들을 추출합니다 (유통기한 포함)."""
     items = []
     product_ids = form.getlist("item_product_id[]")
     quantities = form.getlist("item_quantity[]")
     prices = form.getlist("item_unit_price[]")
+    expiry_dates = form.getlist("item_expiry_date[]")
     for i in range(len(product_ids)):
         if product_ids[i] and quantities[i]:
+            expiry = expiry_dates[i] if i < len(expiry_dates) and expiry_dates[i] else None
             items.append({
                 "product_id": int(product_ids[i]),
                 "quantity": float(quantities[i]),
                 "unit_price": float(prices[i]) if i < len(prices) else 0,
+                "expiry_date": expiry,
             })
     return items

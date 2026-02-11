@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Transfer #{{ transfer.id }} - Hana StockMaster{% endblock %}
+{% block page_title %}Transfer #{{ transfer.id }}{% endblock %}
+{% block content %}
+<div class="mb-3">
+  <a href="{{ url_for('transfer.list_transfers') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back to List</a>
+</div>
+
+<div class="row g-4">
+  <!-- 이동 정보 -->
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white">
+        <h6 class="mb-0">Transfer Info</h6>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label text-muted small mb-0">Status</label>
+          <div>
+            {% if transfer.status == 'pending' %}
+              <span class="badge bg-secondary fs-6">Pending</span>
+            {% elif transfer.status == 'shipped' %}
+              <span class="badge bg-primary fs-6">Shipped</span>
+            {% elif transfer.status == 'received' %}
+              <span class="badge bg-success fs-6">Received</span>
+            {% elif transfer.status == 'cancelled' %}
+              <span class="badge bg-danger fs-6">Cancelled</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-muted small mb-0">From</label>
+          <div class="fw-bold">{{ transfer.from_store_name }}</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-muted small mb-0">To</label>
+          <div class="fw-bold">{{ transfer.to_store_name }}</div>
+        </div>
+        {% if transfer.memo %}
+        <div class="mb-3">
+          <label class="form-label text-muted small mb-0">Memo</label>
+          <div>{{ transfer.memo }}</div>
+        </div>
+        {% endif %}
+        <hr>
+        <div class="small text-muted">
+          <div><i class="bi bi-calendar me-1"></i>Created: {{ transfer.created_at.strftime('%Y-%m-%d %H:%M') if transfer.created_at else '-' }}</div>
+          <div><i class="bi bi-person me-1"></i>By: {{ transfer.requested_by_name or '-' }}</div>
+          {% if transfer.shipped_at %}
+          <div class="mt-1"><i class="bi bi-truck me-1"></i>Shipped: {{ transfer.shipped_at.strftime('%Y-%m-%d %H:%M') }}</div>
+          <div><i class="bi bi-person me-1"></i>By: {{ transfer.shipped_by_name or '-' }}</div>
+          {% endif %}
+          {% if transfer.received_at %}
+          <div class="mt-1"><i class="bi bi-check-circle me-1"></i>Received: {{ transfer.received_at.strftime('%Y-%m-%d %H:%M') }}</div>
+          <div><i class="bi bi-person me-1"></i>By: {{ transfer.received_by_name or '-' }}</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- 액션 버튼 -->
+    <div class="card border-0 shadow-sm mt-3">
+      <div class="card-body">
+        {% if transfer.status == 'pending' %}
+          <form method="post" action="{{ url_for('transfer.ship_transfer', transfer_id=transfer.id) }}"
+                onsubmit="return confirm('Confirm shipment? This will deduct inventory from the source store.')">
+            <button type="submit" class="btn btn-primary w-100 mb-2">
+              <i class="bi bi-truck me-1"></i>Confirm Shipment</button>
+          </form>
+          <form method="post" action="{{ url_for('transfer.cancel_transfer', transfer_id=transfer.id) }}"
+                onsubmit="return confirm('Cancel this transfer?')">
+            <button type="submit" class="btn btn-outline-danger w-100">
+              <i class="bi bi-x-circle me-1"></i>Cancel Transfer</button>
+          </form>
+        {% elif transfer.status == 'shipped' %}
+          <button type="button" class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#receiveModal">
+            <i class="bi bi-check-circle me-1"></i>Confirm Receipt</button>
+        {% elif transfer.status == 'received' %}
+          <div class="text-center text-success">
+            <i class="bi bi-check-circle-fill fs-3"></i>
+            <div class="mt-1">Completed</div>
+          </div>
+        {% elif transfer.status == 'cancelled' %}
+          <div class="text-center text-danger">
+            <i class="bi bi-x-circle-fill fs-3"></i>
+            <div class="mt-1">Cancelled</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- 품목 목록 -->
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white">
+        <h6 class="mb-0">Transfer Items ({{ transfer.items|length }})</h6>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Product</th>
+              <th>Location</th>
+              <th>Expiry</th>
+              <th class="text-end">Quantity</th>
+              {% if transfer.status == 'received' %}
+              <th class="text-end">Received</th>
+              {% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in transfer.items %}
+            <tr>
+              <td>
+                <code>{{ item.product_code }}</code>
+                <span class="ms-1">{{ item.product_name }}</span>
+                <small class="text-muted">({{ item.unit }})</small>
+              </td>
+              <td><span class="badge bg-secondary">{{ item.location }}</span></td>
+              <td>
+                {% if item.expiry_date %}
+                  <span class="text-muted">{{ item.expiry_date.strftime('%Y-%m-%d') if item.expiry_date else '-' }}</span>
+                {% else %}
+                  <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+              <td class="text-end fw-bold">{{ item.quantity|fmt_qty }}</td>
+              {% if transfer.status == 'received' %}
+              <td class="text-end">
+                {% set recv = item.received_quantity if item.received_quantity is not none else item.quantity %}
+                <span class="{{ 'text-danger' if recv < item.quantity else 'text-success' }}">
+                  {{ recv|fmt_qty }}
+                </span>
+              </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light">
+            <tr>
+              <td colspan="{{ 3 }}"><strong>Total</strong></td>
+              <td class="text-end fw-bold">
+                {{ transfer.items|map(attribute='quantity')|sum|fmt_qty }}
+              </td>
+              {% if transfer.status == 'received' %}
+              <td class="text-end fw-bold">
+                {% set total_recv = namespace(val=0) %}
+                {% for item in transfer.items %}
+                  {% set recv = item.received_quantity if item.received_quantity is not none else item.quantity %}
+                  {% set total_recv.val = total_recv.val + recv %}
+                {% endfor %}
+                {{ total_recv.val|fmt_qty }}
+              </td>
+              {% endif %}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 수령 확인 모달 -->
+{% if transfer.status == 'shipped' %}
+<div class="modal fade" id="receiveModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('transfer.receive_transfer', transfer_id=transfer.id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title">Confirm Receipt</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted">Enter the actual received quantity for each item. If quantity is the same as shipped, leave as-is.</p>
+          <table class="table table-sm">
+            <thead><tr><th>Product</th><th>Shipped</th><th>Received Qty</th></tr></thead>
+            <tbody>
+              {% for item in transfer.items %}
+              <tr>
+                <td>
+                  <code>{{ item.product_code }}</code> {{ item.product_name }}
+                  {% if item.expiry_date %}
+                  <small class="text-muted">(exp: {{ item.expiry_date.strftime('%Y-%m-%d') }})</small>
+                  {% endif %}
+                </td>
+                <td>{{ item.quantity|fmt_qty }} {{ item.unit }}</td>
+                <td style="width:150px;">
+                  <input type="hidden" name="item_id[]" value="{{ item.id }}">
+                  <input type="number" name="received_qty[]" class="form-control form-control-sm"
+                         value="{{ item.quantity }}" min="0" max="{{ item.quantity }}" step="0.01" required>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-check-circle me-1"></i>Confirm Receipt</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

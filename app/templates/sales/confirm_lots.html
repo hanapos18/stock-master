@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Confirm Sale {{ sale.sale_number }} - Lot Selection{% endblock %}
+{% block page_title %}Confirm Sale {{ sale.sale_number }} — Select Lots{% endblock %}
+{% block content %}
+<style>
+.lot-row { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 8px 12px; margin-bottom: 4px; }
+.lot-row.lot-expired { border-left: 4px solid #dc3545; }
+.lot-row.lot-warning { border-left: 4px solid #ffc107; }
+.lot-row.lot-ok { border-left: 4px solid #28a745; }
+.lot-row.lot-none { border-left: 4px solid #6c757d; }
+.item-card { border: 1px solid #dee2e6; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+</style>
+
+<form method="post" id="confirmForm">
+  <div class="alert alert-info mb-3">
+    <i class="bi bi-info-circle me-1"></i>
+    Select the specific lots to deduct for each product. Verify expiry dates before confirming.
+  </div>
+
+  {% for item in sale.line_items %}
+  {% set item_idx = loop.index0 %}
+  <div class="item-card">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div>
+        <strong>{{ item.product_code }} — {{ item.product_name }}</strong>
+        <span class="text-muted ms-2">({{ item.unit }})</span>
+      </div>
+      <div>
+        Required: <span class="badge bg-primary fs-6">{{ item.quantity|fmt_qty }}</span>
+        <span class="ms-2">Allocated: <span class="badge bg-success fs-6 item-allocated" data-idx="{{ item_idx }}">0</span></span>
+      </div>
+    </div>
+
+    {% if item.lots %}
+    {% set today = import('datetime').date.today() if false %}
+    {% for lot in item.lots %}
+    {% set days_left = (lot.expiry_date - today_date).days if lot.expiry_date and today_date else None %}
+    <div class="lot-row {% if lot.expiry_date %}{% if days_left is not none and days_left < 0 %}lot-expired{% elif days_left is not none and days_left <= 7 %}lot-warning{% else %}lot-ok{% endif %}{% else %}lot-none{% endif %}">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <span class="me-3">Loc: <strong>{{ lot.location }}</strong></span>
+          {% if lot.expiry_date %}
+            {% set dl = (lot.expiry_date - today_date).days if today_date else 0 %}
+            {% if dl < 0 %}
+              <span class="badge bg-danger">Expired ({{ lot.expiry_date }})</span>
+            {% elif dl <= 7 %}
+              <span class="badge bg-warning text-dark">{{ dl }}d ({{ lot.expiry_date }})</span>
+            {% elif dl <= 30 %}
+              <span class="badge bg-info text-dark">{{ dl }}d ({{ lot.expiry_date }})</span>
+            {% else %}
+              <span class="text-success">{{ lot.expiry_date }} ({{ dl }}d)</span>
+            {% endif %}
+          {% else %}
+            <span class="text-muted">No expiry</span>
+          {% endif %}
+          <span class="ms-3">Available: <strong>{{ lot.quantity|fmt_qty }}</strong></span>
+        </div>
+        <div style="width:130px;">
+          <input type="hidden" name="lot_id[]" value="{{ lot.id }}">
+          <input type="number" name="lot_qty[]" class="form-control form-control-sm lot-qty-input"
+                 data-idx="{{ item_idx }}"
+                 value="0" min="0" max="{{ lot.quantity }}" step="0.01"
+                 onchange="updateItemTotal({{ item_idx }})"
+                 oninput="updateItemTotal({{ item_idx }})">
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="text-warning"><i class="bi bi-exclamation-triangle"></i> No stock available for this product</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <div class="mt-3 d-flex justify-content-between align-items-center">
+    <a href="{{ url_for('sales.view_sale', sale_id=sale.id) }}" class="btn btn-outline-secondary">Back</a>
+    <button type="submit" class="btn btn-success btn-lg" id="submitBtn">
+      <i class="bi bi-check-circle me-1"></i>Confirm Sale
+    </button>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateItemTotal(idx) {
+  var total = 0;
+  document.querySelectorAll('.lot-qty-input[data-idx="' + idx + '"]').forEach(function(input) {
+    total += parseFloat(input.value) || 0;
+  });
+  var badge = document.querySelector('.item-allocated[data-idx="' + idx + '"]');
+  if (badge) badge.textContent = total.toFixed(2);
+}
+</script>
+{% endblock %}

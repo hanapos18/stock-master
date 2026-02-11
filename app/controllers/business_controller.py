@@ -62,16 +62,18 @@ def load_store(store_id: int) -> Optional[Dict]:
 def save_store(data: Dict) -> int:
     """매장을 생성합니다."""
     return insert(
-        "INSERT INTO stk_stores (business_id, name, address, phone) VALUES (%s, %s, %s, %s)",
-        (data["business_id"], data["name"], data.get("address", ""), data.get("phone", "")),
+        "INSERT INTO stk_stores (business_id, name, address, phone, is_warehouse) VALUES (%s, %s, %s, %s, %s)",
+        (data["business_id"], data["name"], data.get("address", ""),
+         data.get("phone", ""), data.get("is_warehouse", 0)),
     )
 
 
 def update_store(store_id: int, data: Dict) -> int:
     """매장 정보를 수정합니다."""
     return execute(
-        "UPDATE stk_stores SET name=%s, address=%s, phone=%s WHERE id=%s",
-        (data["name"], data.get("address", ""), data.get("phone", ""), store_id),
+        "UPDATE stk_stores SET name=%s, address=%s, phone=%s, is_warehouse=%s WHERE id=%s",
+        (data["name"], data.get("address", ""), data.get("phone", ""),
+         data.get("is_warehouse", 0), store_id),
     )
 
 

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Transaction History - StockMaster{% endblock %}
+{% block title %}Transaction History - Hana StockMaster{% endblock %}
 {% block page_title %}Transaction History{% endblock %}
 {% block content %}
 <div class="d-flex gap-2 mb-3">
@@ -20,7 +20,7 @@
           <td class="small">{{ tx.created_at.strftime('%Y-%m-%d %H:%M') if tx.created_at else '' }}</td>
           <td><span class="badge bg-{{ 'success' if tx.type=='in' else 'danger' if tx.type in ('out','discard','sale') else 'info' if tx.type=='move' else 'warning' }}">{{ tx.type|upper }}</span></td>
           <td>{{ tx.product_name }}</td>
-          <td class="fw-bold">{{ tx.quantity }}</td>
+          <td class="fw-bold">{{ tx.quantity|fmt_qty }}</td>
           <td>{{ tx.unit }}</td>
           <td class="text-end">{{ tx.unit_price|fmt_price }}</td>
           <td class="text-end">{{ tx.total_amount|fmt_price }}</td>

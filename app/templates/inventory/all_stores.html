@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}All Stores Inventory - Hana StockMaster{% endblock %}
+{% block page_title %}All Stores Inventory{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('inventory.list_inventory') }}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-shop me-1"></i>Current Store</a>
+    <a href="{{ url_for('inventory.all_stores_inventory') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-globe me-1"></i>All Stores</a>
+  </div>
+  <form class="d-flex gap-2" method="get">
+    <input type="text" name="search" class="form-control form-control-sm" style="width:200px;"
+           placeholder="Search product..." value="{{ search }}">
+    <select name="category_id" class="form-select form-select-sm" style="width:180px;" onchange="this.form.submit()">
+      <option value="">All Categories</option>
+      {% for c in categories %}
+      <option value="{{ c.id }}" {{ 'selected' if c.id == selected_category }}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-sm btn-outline-primary">Search</button>
+  </form>
+</div>
+
+<!-- 매장별 요약 -->
+{% if store_summary %}
+<div class="row g-2 mb-3">
+  {% for s in store_summary %}
+  <div class="col-auto">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body py-2 px-3 text-center">
+        <div class="small text-muted">
+          {{ s.name }}
+          {% if s.is_warehouse %}<i class="bi bi-building text-primary ms-1"></i>{% endif %}
+        </div>
+        <div class="fw-bold">{{ s.product_count }} items</div>
+        <div class="small text-muted">{{ s.total_quantity|fmt_qty }} qty</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0" id="allStoresTable">
+      <thead class="table-light">
+        <tr>
+          <th>Code</th>
+          <th>Product</th>
+          <th>Category</th>
+          <th>Unit</th>
+          <th class="text-end">Total Qty</th>
+          <th>Store Breakdown</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td><code>{{ item.product_code }}</code></td>
+          <td>{{ item.product_name }}</td>
+          <td>{{ item.category_name or '-' }}</td>
+          <td>{{ item.unit }}</td>
+          <td class="text-end fw-bold">{{ item.total_quantity|fmt_qty }}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-secondary" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#breakdown-{{ item.product_id }}">
+              <i class="bi bi-chevron-down"></i> Detail
+            </button>
+            <div class="collapse mt-2" id="breakdown-{{ item.product_id }}">
+              <div class="breakdown-content" data-product-id="{{ item.product_id }}">
+                <div class="text-muted small">Loading...</div>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not items %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No inventory found</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var target = document.querySelector(btn.getAttribute('data-bs-target'));
+    var contentDiv = target.querySelector('.breakdown-content');
+    if (contentDiv.dataset.loaded) return;
+    var productId = contentDiv.dataset.productId;
+    fetch('/inventory/api/store-breakdown/' + productId)
+      .then(function(r) { return r.json(); })
+      .then(function(stores) {
+        var html = '<table class="table table-sm table-bordered mb-0"><thead><tr><th>Store</th><th class="text-end">Quantity</th></tr></thead><tbody>';
+        stores.forEach(function(s) {
+          var icon = s.is_warehouse ? ' <i class="bi bi-building text-primary"></i>' : '';
+          html += '<tr><td>' + s.store_name + icon + '</td><td class="text-end fw-bold">' + s.quantity + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        contentDiv.innerHTML = html;
+        contentDiv.dataset.loaded = '1';
+      });
+  });
+});
+</script>
+{% endblock %}

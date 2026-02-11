@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Wholesale Balances{% endblock %}
+{% block page_title %}Wholesale Balances (Accounts Receivable){% endblock %}
+{% block content %}
+<!-- 총 미수금 요약 -->
+<div class="row mb-4">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm bg-danger bg-opacity-10">
+      <div class="card-body text-center">
+        <h6 class="text-muted">Total Outstanding Balance</h6>
+        <h3 class="text-danger fw-bold">{{ total_balance|fmt_price }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center">
+        <h6 class="text-muted">Clients with Balance</h6>
+        <h3 class="fw-bold">{{ client_balances|selectattr('balance', 'gt', 0)|list|length }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center">
+        <h6 class="text-muted">Total Clients</h6>
+        <h3 class="fw-bold">{{ client_balances|length }}</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 거래처별 미수금 테이블 -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-people me-2"></i>Client Balances</h6></div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0"><thead class="table-light"><tr>
+      <th>Client</th><th>Phone</th><th>Orders</th><th class="text-end">Total Order</th><th class="text-end">Total Paid</th><th class="text-end">Balance</th><th>Actions</th>
+    </tr></thead><tbody>
+      {% for c in client_balances %}<tr class="{{ 'table-danger' if c.balance|float > 0 else '' }}">
+        <td><strong>{{ c.name }}</strong></td>
+        <td>{{ c.phone or '-' }}</td>
+        <td>{{ c.order_count }}</td>
+        <td class="text-end">{{ c.total_order|fmt_price }}</td>
+        <td class="text-end text-success">{{ c.total_paid|fmt_price }}</td>
+        <td class="text-end fw-bold {{ 'text-danger' if c.balance|float > 0 else 'text-success' }}">{{ c.balance|fmt_price }}</td>
+        <td>
+          <a href="{{ url_for('wholesale.client_statement', client_id=c.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-text me-1"></i>Statement</a>
+        </td>
+      </tr>{% endfor %}
+      {% if not client_balances %}<tr><td colspan="7" class="text-center text-muted py-3">No clients</td></tr>{% endif %}
+    </tbody></table>
+  </div>
+</div>
+
+<!-- 수표 만기 스케줄 -->
+{% if check_schedule %}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-calendar-event me-2"></i>Check Maturity Schedule</h6></div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0"><thead class="table-light"><tr>
+      <th>Check Date</th><th>Client</th><th>Order</th><th>Check #</th><th class="text-end">Amount</th>
+    </tr></thead><tbody>
+      {% for ch in check_schedule %}<tr>
+        <td>{{ ch.check_date }}</td>
+        <td>{{ ch.client_name }}</td>
+        <td>{{ ch.order_number }}</td>
+        <td>{{ ch.check_number or '-' }}</td>
+        <td class="text-end">{{ ch.amount|fmt_price }}</td>
+      </tr>{% endfor %}
+    </tbody></table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -31,7 +31,7 @@
   <table class="items-table"><thead><tr><th>#</th><th>Code</th><th>Product</th><th>Qty</th><th>Unit</th><th>Price</th><th>Amount</th></tr></thead><tbody>
     {% for i in sale.line_items %}<tr>
       <td style="text-align:center">{{ loop.index }}</td><td>{{ i.product_code }}</td><td>{{ i.product_name }}</td>
-      <td class="text-right">{{ i.quantity }}</td><td>{{ i.unit }}</td>
+      <td class="text-right">{{ i.quantity|fmt_qty }}</td><td>{{ i.unit }}</td>
       <td class="text-right">{{ i.unit_price|fmt_price }}</td><td class="text-right">{{ i.amount|fmt_price }}</td>
     </tr>{% endfor %}
     <tr class="total-row"><td colspan="5"></td><td class="text-right">Total:</td><td class="text-right">{{ sale.total_amount|fmt_price }}</td></tr>

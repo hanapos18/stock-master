@@ -86,6 +86,7 @@ def create_store(business_id: int):
         "name": request.form["name"],
         "address": request.form.get("address", ""),
         "phone": request.form.get("phone", ""),
+        "is_warehouse": 1 if request.form.get("is_warehouse") else 0,
     }
     business_controller.save_store(data)
     flash("Store created successfully", "success")
@@ -101,6 +102,7 @@ def edit_store(store_id: int):
         "name": request.form["name"],
         "address": request.form.get("address", ""),
         "phone": request.form.get("phone", ""),
+        "is_warehouse": 1 if request.form.get("is_warehouse") else 0,
     }
     business_controller.update_store(store_id, data)
     flash("Store updated successfully", "success")

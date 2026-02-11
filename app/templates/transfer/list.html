@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Transfers - Hana StockMaster{% endblock %}
+{% block page_title %}Inter-Store Transfers{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('transfer.list_transfers', view='my', status=selected_status) }}"
+       class="btn btn-sm {{ 'btn-primary' if view_mode=='my' else 'btn-outline-primary' }}">My Store</a>
+    <a href="{{ url_for('transfer.list_transfers', view='all', status=selected_status) }}"
+       class="btn btn-sm {{ 'btn-primary' if view_mode=='all' else 'btn-outline-primary' }}">All Stores</a>
+  </div>
+  <a href="{{ url_for('transfer.create_transfer') }}" class="btn btn-primary">
+    <i class="bi bi-plus-circle me-1"></i>New Transfer</a>
+</div>
+
+<!-- 상태 필터 -->
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if not selected_status }}"
+       href="{{ url_for('transfer.list_transfers', view=view_mode) }}">All</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if selected_status=='pending' }}"
+       href="{{ url_for('transfer.list_transfers', view=view_mode, status='pending') }}">
+      <span class="badge bg-secondary me-1">Pending</span></a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if selected_status=='shipped' }}"
+       href="{{ url_for('transfer.list_transfers', view=view_mode, status='shipped') }}">
+      <span class="badge bg-primary me-1">Shipped</span></a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if selected_status=='received' }}"
+       href="{{ url_for('transfer.list_transfers', view=view_mode, status='received') }}">
+      <span class="badge bg-success me-1">Received</span></a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if selected_status=='cancelled' }}"
+       href="{{ url_for('transfer.list_transfers', view=view_mode, status='cancelled') }}">
+      <span class="badge bg-danger me-1">Cancelled</span></a>
+  </li>
+</ul>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>From</th>
+          <th></th>
+          <th>To</th>
+          <th>Items</th>
+          <th>Total Qty</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th>By</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transfers %}
+        <tr class="cursor-pointer" onclick="location.href='{{ url_for('transfer.detail_transfer', transfer_id=t.id) }}'">
+          <td><a href="{{ url_for('transfer.detail_transfer', transfer_id=t.id) }}" class="fw-bold text-decoration-none">#{{ t.id }}</a></td>
+          <td>
+            <span class="{{ 'fw-bold text-primary' if t.from_store_id == current_store_id }}">{{ t.from_store_name }}</span>
+          </td>
+          <td><i class="bi bi-arrow-right text-muted"></i></td>
+          <td>
+            <span class="{{ 'fw-bold text-primary' if t.to_store_id == current_store_id }}">{{ t.to_store_name }}</span>
+          </td>
+          <td>{{ t.item_count }}</td>
+          <td>{{ t.total_quantity|fmt_qty }}</td>
+          <td>
+            {% if t.status == 'pending' %}
+              <span class="badge bg-secondary">Pending</span>
+            {% elif t.status == 'shipped' %}
+              <span class="badge bg-primary">Shipped</span>
+            {% elif t.status == 'received' %}
+              <span class="badge bg-success">Received</span>
+            {% elif t.status == 'cancelled' %}
+              <span class="badge bg-danger">Cancelled</span>
+            {% endif %}
+          </td>
+          <td class="small text-muted">{{ t.created_at.strftime('%m/%d %H:%M') if t.created_at else '' }}</td>
+          <td class="small">{{ t.requested_by_name or '-' }}</td>
+        </tr>
+        {% endfor %}
+        {% if not transfers %}
+        <tr><td colspan="9" class="text-center text-muted py-4">No transfers found</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

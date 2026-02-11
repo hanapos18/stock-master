@@ -1,5 +1,5 @@
 """인증 비즈니스 로직"""
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from werkzeug.security import check_password_hash, generate_password_hash
 from app.db import fetch_one, fetch_all, insert
 
@@ -7,7 +7,7 @@ from app.db import fetch_one, fetch_all, insert
 def verify_login(username: str, password: str) -> Optional[Dict]:
     """사용자 로그인을 검증합니다."""
     user = fetch_one(
-        "SELECT u.*, b.name AS business_name, b.type AS business_type "
+        "SELECT u.*, b.name AS business_name, b.type AS business_type, b.pos_db_name "
         "FROM stk_users u JOIN stk_businesses b ON u.business_id = b.id "
         "WHERE u.username = %s AND u.is_active = 1",
         (username,),
@@ -17,6 +17,39 @@ def verify_login(username: str, password: str) -> Optional[Dict]:
     if not check_password_hash(user["password_hash"], password):
         return None
     return user
+
+
+def can_access_all_stores(user: Dict) -> bool:
+    """사용자가 전체 매장에 접근 가능한지 확인합니다.
+    - admin 역할: 항상 전체 접근
+    - store_id가 NULL: 본점/관리자 (전체 접근)
+    - store_id가 있으면: 해당 지점만
+    """
+    if user.get("role") == "admin":
+        return True
+    if user.get("store_id") is None:
+        return True
+    return False
+
+
+def get_accessible_stores(user: Dict, all_stores: List[Dict]) -> List[Dict]:
+    """사용자가 접근 가능한 매장 목록을 반환합니다."""
+    if can_access_all_stores(user):
+        return all_stores
+    user_store_id = user.get("store_id")
+    return [s for s in all_stores if s["id"] == user_store_id]
+
+
+def get_default_store(user: Dict, accessible_stores: List[Dict]) -> Optional[Dict]:
+    """로그인 시 자동 선택할 기본 매장을 반환합니다."""
+    if not accessible_stores:
+        return None
+    user_store_id = user.get("store_id")
+    if user_store_id:
+        for s in accessible_stores:
+            if s["id"] == user_store_id:
+                return s
+    return accessible_stores[0]
 
 
 def create_initial_admin(username: str, password: str, business_name: str, business_type: str) -> Dict:
@@ -47,14 +80,24 @@ def has_any_user() -> bool:
 def load_user_session_data(user_id: int) -> Dict:
     """세션에 저장할 사용자 정보를 로드합니다."""
     user = fetch_one(
-        "SELECT u.id, u.username, u.name, u.role, u.business_id, "
+        "SELECT u.id, u.username, u.name, u.role, u.store_id, u.business_id, "
         "b.name AS business_name, b.type AS business_type, b.pos_db_name "
         "FROM stk_users u JOIN stk_businesses b ON u.business_id = b.id "
         "WHERE u.id = %s",
         (user_id,),
     )
-    stores = fetch_all(
-        "SELECT id, name FROM stk_stores WHERE business_id = %s AND is_active = 1",
+    all_stores = fetch_all(
+        "SELECT id, name, is_warehouse FROM stk_stores "
+        "WHERE business_id = %s AND is_active = 1",
         (user["business_id"],),
     )
-    return {"user": user, "stores": stores}
+    accessible = get_accessible_stores(user, all_stores)
+    default_store = get_default_store(user, accessible)
+    is_hq = can_access_all_stores(user)
+    return {
+        "user": user,
+        "stores": accessible,
+        "all_stores": all_stores,
+        "default_store": default_store,
+        "is_hq": is_hq,
+    }
