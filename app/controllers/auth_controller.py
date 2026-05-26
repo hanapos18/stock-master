@@ -87,7 +87,7 @@ def load_user_session_data(user_id: int) -> Dict:
         (user_id,),
     )
     all_stores = fetch_all(
-        "SELECT id, name, is_warehouse FROM stk_stores "
+        "SELECT id, name, store_number, is_warehouse FROM stk_stores "
         "WHERE business_id = %s AND is_active = 1",
         (user["business_id"],),
     )

@@ -29,12 +29,14 @@ CREATE TABLE IF NOT EXISTS stk_stores (
     id INT AUTO_INCREMENT PRIMARY KEY,
     business_id INT NOT NULL,
     name VARCHAR(100) NOT NULL,
+    store_number VARCHAR(20) NULL COMMENT 'POS store_number 매핑 (예: 001, 002)',
     address TEXT,
     phone VARCHAR(20),
     is_warehouse TINYINT(1) DEFAULT 0 COMMENT '1=central warehouse',
     is_active TINYINT(1) DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (business_id) REFERENCES stk_businesses(id) ON DELETE CASCADE
+    FOREIGN KEY (business_id) REFERENCES stk_businesses(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_business_store_number (business_id, store_number)
 ) ENGINE=InnoDB;
 
 -- ── 사용자 ──

@@ -133,7 +133,7 @@ def _register_error_handlers(application: Flask) -> None:
             from app.db import fetch_all
             try:
                 stores = fetch_all(
-                    "SELECT id, name FROM stk_stores WHERE business_id = %s AND is_active = 1",
+                    "SELECT id, name, store_number FROM stk_stores WHERE business_id = %s AND is_active = 1",
                     (session["business"]["id"],),
                 )
                 if stores:

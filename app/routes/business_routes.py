@@ -84,6 +84,7 @@ def create_store(business_id: int):
     data = {
         "business_id": business_id,
         "name": request.form["name"],
+        "store_number": request.form.get("store_number", "").strip() or None,
         "address": request.form.get("address", ""),
         "phone": request.form.get("phone", ""),
         "is_warehouse": 1 if request.form.get("is_warehouse") else 0,
@@ -100,6 +101,7 @@ def edit_store(store_id: int):
     store = business_controller.load_store(store_id)
     data = {
         "name": request.form["name"],
+        "store_number": request.form.get("store_number", "").strip() or None,
         "address": request.form.get("address", ""),
         "phone": request.form.get("phone", ""),
         "is_warehouse": 1 if request.form.get("is_warehouse") else 0,

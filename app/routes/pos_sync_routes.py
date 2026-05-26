@@ -20,7 +20,9 @@ def _verify_api_key() -> bool:
 
 
 def _resolve_business(data: dict) -> dict:
-    """요청 데이터에서 business 정보를 조회합니다."""
+    """요청 데이터에서 business/store 정보를 조회합니다.
+    store_number가 있으면 정확한 매장 매칭, 없으면 첫 active 매장 폴백.
+    """
     business_id = data.get("business_id")
     if not business_id:
         pos_db_name = data.get("pos_db_name", config.POS_DB_NAME)
@@ -38,10 +40,20 @@ def _resolve_business(data: dict) -> dict:
     else:
         biz = fetch_one("SELECT id, type FROM stk_businesses WHERE id = %s", (business_id,))
         business_type = biz["type"] if biz else "mart"
-    store = fetch_one(
-        "SELECT id FROM stk_stores WHERE business_id = %s AND is_active = 1 LIMIT 1",
-        (business_id,),
-    )
+    store_number = data.get("store_number")
+    store = None
+    if store_number:
+        store = fetch_one(
+            "SELECT id FROM stk_stores WHERE business_id = %s AND store_number = %s AND is_active = 1",
+            (business_id, store_number),
+        )
+        if not store:
+            print(f"⚠️ store_number '{store_number}' 매칭 실패 (business_id={business_id}) → 첫 매장 폴백")
+    if not store:
+        store = fetch_one(
+            "SELECT id FROM stk_stores WHERE business_id = %s AND is_active = 1 LIMIT 1",
+            (business_id,),
+        )
     store_id = store["id"] if store else None
     return {"business_id": business_id, "business_type": business_type, "store_id": store_id}
 
@@ -154,14 +166,19 @@ def manual_sync():
     biz = fetch_one("SELECT id, type, pos_db_name FROM stk_businesses WHERE id = %s", (business_id,))
     if not biz:
         return jsonify({"success": False, "error": "Business not found"}), 404
-    store = fetch_one(
-        "SELECT id FROM stk_stores WHERE business_id = %s AND is_active = 1 LIMIT 1",
-        (business_id,),
-    )
-    if not store:
+    store_id = None
+    if "store" in session and session["store"]:
+        store_id = session["store"]["id"]
+    if not store_id:
+        store = fetch_one(
+            "SELECT id FROM stk_stores WHERE business_id = %s AND is_active = 1 LIMIT 1",
+            (business_id,),
+        )
+        store_id = store["id"] if store else None
+    if not store_id:
         return jsonify({"success": False, "error": "Store not found"}), 404
     result = pos_sync_controller.run_full_sync(
-        business_id, biz["type"], store["id"], biz.get("pos_db_name") or "",
+        business_id, biz["type"], store_id, biz.get("pos_db_name") or "",
     )
     return jsonify({"success": True, "result": result})
 
