@@ -6,9 +6,25 @@
   <div class="card-body">
     <form method="post">
       <div class="row g-3 mb-4">
-        <div class="col-md-4"><label class="form-label">Sale Date *</label><input type="date" name="sale_date" class="form-control" required></div>
-        <div class="col-md-4"><label class="form-label">Customer Name</label><input type="text" name="customer_name" class="form-control"></div>
-        <div class="col-md-4"><label class="form-label">Memo</label><input type="text" name="memo" class="form-control"></div>
+        <div class="col-md-3"><label class="form-label">Sale Date *</label><input type="date" name="sale_date" class="form-control" required></div>
+        <div class="col-md-3">
+          <label class="form-label">Client <small class="text-muted">(optional)</small></label>
+          <select name="client_id" id="clientSelect" class="form-select" onchange="onClientChange()">
+            <option value="">-- No Client --</option>
+            {% for c in clients %}
+            <option value="{{ c.id }}" data-discount="{{ c.default_discount_rate or 0 }}">{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Discount %</label>
+          <div class="input-group">
+            <input type="number" name="discount_rate" id="discountRate" class="form-control" value="0" min="0" max="100" step="0.01">
+            <span class="input-group-text">%</span>
+          </div>
+        </div>
+        <div class="col-md-2"><label class="form-label">Customer Name</label><input type="text" name="customer_name" id="customerName" class="form-control"></div>
+        <div class="col-md-2"><label class="form-label">Memo</label><input type="text" name="memo" class="form-control"></div>
       </div>
       <h6>Items</h6>
       <div class="mb-3 position-relative" style="max-width:400px;">
@@ -17,7 +33,11 @@
       </div>
       <table class="table table-sm"><thead><tr><th>Product</th><th style="width:120px">Qty</th><th style="width:140px">Unit Price</th><th style="width:100px">Amount</th><th style="width:50px"></th></tr></thead>
         <tbody id="itemsBody"></tbody>
-        <tfoot><tr><td colspan="3" class="text-end fw-bold">Total:</td><td class="fw-bold" id="grandTotal">0.00</td><td></td></tr></tfoot>
+        <tfoot>
+          <tr><td colspan="3" class="text-end fw-bold">Subtotal:</td><td class="fw-bold" id="grandTotal">0.00</td><td></td></tr>
+          <tr id="discountRow" style="display:none;"><td colspan="3" class="text-end text-danger">Discount (<span id="discRateDisplay">0</span>%):</td><td class="text-danger fw-bold" id="discountDisplay">-0.00</td><td></td></tr>
+          <tr id="finalRow" style="display:none;"><td colspan="3" class="text-end fw-bold text-primary">Final Total:</td><td class="fw-bold text-primary" id="finalTotal">0.00</td><td></td></tr>
+        </tfoot>
       </table>
       <button type="submit" class="btn btn-primary">Create Sale</button>
       <a href="{{ url_for('sales.list_sales') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
@@ -26,5 +46,50 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script>initProductSearch('productSearch', 'searchResults', function(p) { addItemRow('itemsBody', p, 'sell'); });</script>
+<script>
+initProductSearch('productSearch', 'searchResults', function(p) { addItemRow('itemsBody', p, 'sell'); });
+
+function onClientChange() {
+  const sel = document.getElementById('clientSelect');
+  const opt = sel.options[sel.selectedIndex];
+  const rate = parseFloat(opt.dataset.discount || 0);
+  document.getElementById('discountRate').value = rate;
+  if (sel.value && !document.getElementById('customerName').value) {
+    document.getElementById('customerName').value = opt.text;
+  }
+  updateDiscountDisplay();
+}
+
+function updateDiscountDisplay() {
+  const rate = parseFloat(document.getElementById('discountRate').value) || 0;
+  const subtotal = parseFloat(document.getElementById('grandTotal').textContent.replace(/,/g, '')) || 0;
+  const discRow = document.getElementById('discountRow');
+  const finalRow = document.getElementById('finalRow');
+  if (rate > 0) {
+    const discAmt = subtotal * rate / 100;
+    document.getElementById('discRateDisplay').textContent = rate;
+    document.getElementById('discountDisplay').textContent = '-' + discAmt.toLocaleString('en-US', {minimumFractionDigits:2});
+    document.getElementById('finalTotal').textContent = (subtotal - discAmt).toLocaleString('en-US', {minimumFractionDigits:2});
+    discRow.style.display = '';
+    finalRow.style.display = '';
+  } else {
+    discRow.style.display = 'none';
+    finalRow.style.display = 'none';
+  }
+}
+
+document.getElementById('discountRate').addEventListener('input', updateDiscountDisplay);
+
+const origCalcTotal = window.calcGrandTotal;
+if (typeof origCalcTotal === 'function') {
+  window.calcGrandTotal = function() {
+    origCalcTotal.apply(this, arguments);
+    updateDiscountDisplay();
+  };
+}
+
+const observer = new MutationObserver(updateDiscountDisplay);
+const tbody = document.getElementById('itemsBody');
+if (tbody) observer.observe(tbody, { childList: true, subtree: true, characterData: true });
+</script>
 {% endblock %}

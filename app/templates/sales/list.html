@@ -64,8 +64,11 @@
   <div class="col-md-3">
     <div class="card border-0 shadow-sm">
       <div class="card-body py-2 text-center">
-        <small class="text-muted">Total Amount</small>
-        <h5 class="fw-bold text-primary mb-0">{{ summary.total_amount|fmt_price }}</h5>
+        <small class="text-muted">Final Amount</small>
+        <h5 class="fw-bold text-primary mb-0">{{ (summary.total_final or summary.total_amount)|fmt_price }}</h5>
+        {% if summary.total_discount and summary.total_discount > 0 %}
+        <small class="text-danger">Disc: -{{ summary.total_discount|fmt_price }}</small>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -89,16 +92,22 @@
 <!-- 판매 목록 -->
 <div class="card border-0 shadow-sm"><div class="table-responsive">
   <table class="table table-hover mb-0"><thead class="table-light"><tr>
-    <th>Number</th><th>Date</th><th>Customer</th><th>Store</th><th>Amount</th><th>Status</th><th>Actions</th>
+    <th>Number</th><th>Date</th><th>Customer</th><th>Store</th><th>Amount</th><th>Discount</th><th>Final</th><th>Status</th><th>Actions</th>
   </tr></thead><tbody>
     {% for sa in sales %}<tr>
       <td><a href="{{ url_for('sales.view_sale', sale_id=sa.id) }}">{{ sa.sale_number }}</a></td>
-      <td>{{ sa.sale_date }}</td><td>{{ sa.customer_name or '-' }}</td><td>{{ sa.store_name }}</td>
-      <td class="text-end fw-bold">{{ sa.total_amount|fmt_price }}</td>
+      <td>{{ sa.sale_date }}</td>
+      <td>{{ sa.client_name or sa.customer_name or '-' }}
+        {% if sa.client_name %}<span class="badge bg-info" style="font-size:0.6rem">Client</span>{% endif %}
+      </td>
+      <td>{{ sa.store_name }}</td>
+      <td class="text-end">{{ sa.total_amount|fmt_price }}</td>
+      <td class="text-end text-danger">{% if sa.discount_rate and sa.discount_rate > 0 %}{{ sa.discount_rate }}%{% else %}-{% endif %}</td>
+      <td class="text-end fw-bold">{{ (sa.final_amount or sa.total_amount)|fmt_price }}</td>
       <td><span class="badge bg-{{ 'success' if sa.status=='confirmed' else 'warning' if sa.status=='draft' else 'secondary' }}">{{ sa.status }}</span></td>
       <td><a href="{{ url_for('sales.view_sale', sale_id=sa.id) }}" class="btn btn-sm btn-outline-primary">View</a></td>
     </tr>{% endfor %}
-    {% if not sales %}<tr><td colspan="7" class="text-center text-muted py-3">No sales found</td></tr>{% endif %}
+    {% if not sales %}<tr><td colspan="9" class="text-center text-muted py-3">No sales found</td></tr>{% endif %}
   </tbody></table>
 </div></div>
 {% endblock %}

@@ -6,7 +6,9 @@
   <div class="card-body">
     <div class="row mb-3">
       <div class="col-md-3"><strong>Date:</strong> {{ sale.sale_date }}</div>
-      <div class="col-md-3"><strong>Customer:</strong> {{ sale.customer_name or 'N/A' }}</div>
+      <div class="col-md-3"><strong>Customer:</strong> {{ sale.client_name or sale.customer_name or 'N/A' }}
+        {% if sale.client_name %}<span class="badge bg-info ms-1">Client</span>{% endif %}
+      </div>
       <div class="col-md-3"><strong>Store:</strong> {{ sale.store_name }}</div>
       <div class="col-md-3"><strong>Status:</strong> <span class="badge bg-{{ 'success' if sale.status=='confirmed' else 'warning' }}">{{ sale.status }}</span></div>
     </div>
@@ -15,7 +17,11 @@
         <td><code>{{ i.product_code }}</code></td><td>{{ i.product_name }}</td><td>{{ i.quantity|fmt_qty }}</td><td>{{ i.unit }}</td>
         <td class="text-end">{{ i.unit_price|fmt_price }}</td><td class="text-end">{{ i.amount|fmt_price }}</td>
       </tr>{% endfor %}
-      <tr class="fw-bold"><td colspan="5" class="text-end">Total:</td><td class="text-end">{{ sale.total_amount|fmt_price }}</td></tr>
+      <tr class="fw-bold"><td colspan="5" class="text-end">Subtotal:</td><td class="text-end">{{ sale.total_amount|fmt_price }}</td></tr>
+      {% if sale.discount_rate and sale.discount_rate > 0 %}
+      <tr class="text-danger"><td colspan="5" class="text-end">Discount ({{ sale.discount_rate }}%):</td><td class="text-end">-{{ sale.discount_amount|fmt_price }}</td></tr>
+      <tr class="fw-bold text-primary"><td colspan="5" class="text-end">Final Total:</td><td class="text-end">{{ sale.final_amount|fmt_price }}</td></tr>
+      {% endif %}
     </tbody></table>
     <div class="mt-3">
       {% if sale.status == 'draft' %}

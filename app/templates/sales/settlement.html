@@ -56,8 +56,11 @@
   <div class="col-md-3">
     <div class="card border-0 shadow-sm border-primary">
       <div class="card-body py-2 text-center">
-        <small class="text-muted">Period Total Amount</small>
-        <h4 class="fw-bold text-primary mb-0">{{ summary.total_amount|fmt_price }}</h4>
+        <small class="text-muted">Period Final Amount</small>
+        <h4 class="fw-bold text-primary mb-0">{{ (summary.total_final or summary.total_amount)|fmt_price }}</h4>
+        {% if summary.total_discount and summary.total_discount > 0 %}
+        <small class="text-danger">Disc: -{{ summary.total_discount|fmt_price }}</small>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -73,14 +76,17 @@
         <th class="text-center">Sales Count</th>
         <th class="text-center">Confirmed</th>
         <th class="text-center">Draft</th>
-        <th class="text-end">Day Total</th>
+        <th class="text-end">Subtotal</th>
+        <th class="text-end">Discount</th>
+        <th class="text-end">Final</th>
         <th>Actions</th>
       </tr>
     </thead>
     <tbody>
-      {% set ns = namespace(running_total=0) %}
+      {% set ns = namespace(running_total=0, running_final=0) %}
       {% for d in daily %}
       {% set ns.running_total = ns.running_total + (d.day_total|float) %}
+      {% set ns.running_final = ns.running_final + ((d.day_final or d.day_total)|float) %}
       <tr>
         <td class="fw-semibold">{{ d.sale_date }}</td>
         <td class="text-center">{{ d.sale_count }}</td>
@@ -88,7 +94,9 @@
         <td class="text-center">
           {% if d.draft > 0 %}<span class="badge bg-warning">{{ d.draft }}</span>{% else %}-{% endif %}
         </td>
-        <td class="text-end fw-bold">{{ d.day_total|fmt_price }}</td>
+        <td class="text-end">{{ d.day_total|fmt_price }}</td>
+        <td class="text-end text-danger">{% if d.day_discount and d.day_discount > 0 %}-{{ d.day_discount|fmt_price }}{% else %}-{% endif %}</td>
+        <td class="text-end fw-bold">{{ (d.day_final or d.day_total)|fmt_price }}</td>
         <td>
           <a href="{{ url_for('sales.list_sales', date_from=d.sale_date, date_to=d.sale_date) }}"
              class="btn btn-sm btn-outline-primary">View Detail</a>
@@ -96,7 +104,7 @@
       </tr>
       {% endfor %}
       {% if not daily %}
-      <tr><td colspan="6" class="text-center text-muted py-3">No settlement data found</td></tr>
+      <tr><td colspan="8" class="text-center text-muted py-3">No settlement data found</td></tr>
       {% endif %}
     </tbody>
     {% if daily %}
@@ -106,7 +114,9 @@
         <td class="text-center">{{ daily|sum(attribute='sale_count') }}</td>
         <td class="text-center">{{ daily|sum(attribute='confirmed') }}</td>
         <td class="text-center">{{ daily|sum(attribute='draft') }}</td>
-        <td class="text-end text-primary">{{ ns.running_total|fmt_price }}</td>
+        <td class="text-end">{{ ns.running_total|fmt_price }}</td>
+        <td class="text-end text-danger">{% if ns.running_total != ns.running_final %}-{{ (ns.running_total - ns.running_final)|fmt_price }}{% else %}-{% endif %}</td>
+        <td class="text-end text-primary">{{ ns.running_final|fmt_price }}</td>
         <td></td>
       </tr>
     </tfoot>

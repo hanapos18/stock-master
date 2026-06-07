@@ -344,13 +344,18 @@ CREATE TABLE IF NOT EXISTS stk_sales (
     sale_number VARCHAR(50),
     sale_date DATE NOT NULL,
     customer_name VARCHAR(100),
+    client_id INT NULL COMMENT 'wholesale client FK for discount',
     total_amount DECIMAL(16,6) DEFAULT 0,
+    discount_rate DECIMAL(5,2) DEFAULT 0 COMMENT 'applied discount rate pct',
+    discount_amount DECIMAL(16,6) DEFAULT 0,
+    final_amount DECIMAL(16,6) DEFAULT 0,
     status ENUM('draft','confirmed','cancelled') DEFAULT 'draft',
     memo TEXT,
     created_by INT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (business_id) REFERENCES stk_businesses(id) ON DELETE CASCADE,
-    FOREIGN KEY (store_id) REFERENCES stk_stores(id) ON DELETE CASCADE
+    FOREIGN KEY (store_id) REFERENCES stk_stores(id) ON DELETE CASCADE,
+    FOREIGN KEY (client_id) REFERENCES stk_wholesale_clients(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ── 판매 상세 ──

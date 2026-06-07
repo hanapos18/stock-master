@@ -4,7 +4,7 @@ from datetime import date
 from io import BytesIO
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, send_file, jsonify
 from app.routes.dashboard_routes import login_required
-from app.controllers import sales_controller, inventory_controller
+from app.controllers import sales_controller, inventory_controller, wholesale_controller
 from app.services import excel_service
 from app.services import receipt_printer
 
@@ -75,6 +75,8 @@ def create_sale():
             "store_id": store["id"],
             "sale_date": request.form["sale_date"],
             "customer_name": request.form.get("customer_name", ""),
+            "client_id": request.form.get("client_id") or None,
+            "discount_rate": request.form.get("discount_rate", 0),
             "memo": request.form.get("memo", ""),
             "created_by": session["user"]["id"],
         }
@@ -82,7 +84,18 @@ def create_sale():
         sale_id = sales_controller.save_sale(data, items)
         flash("Sale created successfully", "success")
         return redirect(url_for("sales.view_sale", sale_id=sale_id))
-    return render_template("sales/form.html", sale=None)
+    clients = wholesale_controller.load_wholesale_clients(business_id)
+    return render_template("sales/form.html", sale=None, clients=clients)
+
+
+@sales_bp.route("/api/client-discount/<int:client_id>")
+@login_required
+def api_client_discount(client_id: int):
+    """거래처 기본 할인율 조회 API"""
+    client = wholesale_controller.load_wholesale_client(client_id)
+    if not client:
+        return jsonify({"discount_rate": 0})
+    return jsonify({"discount_rate": float(client.get("default_discount_rate", 0))})
 
 
 @sales_bp.route("/<int:sale_id>")

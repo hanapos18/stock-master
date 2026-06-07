@@ -278,6 +278,11 @@ def load_check_schedule(business_id: int) -> List[Dict]:
 
 def _save_order_items(order_id: int, client_id: int, items: List[Dict]) -> Dict:
     """주문 상세를 저장하고 합계를 반환합니다."""
+    client = fetch_one(
+        "SELECT default_discount_rate FROM stk_wholesale_clients WHERE id = %s",
+        (client_id,),
+    )
+    default_rate = float(client["default_discount_rate"]) if client and client["default_discount_rate"] else 0
     total = 0.0
     discount_total = 0.0
     for item in items:
@@ -287,10 +292,13 @@ def _save_order_items(order_id: int, client_id: int, items: List[Dict]) -> Dict:
             "SELECT * FROM stk_wholesale_pricing WHERE client_id=%s AND product_id=%s",
             (client_id, item["product_id"]),
         )
-        disc_rate = float(pricing["discount_rate"]) if pricing and pricing["discount_type"] == "rate" else 0
         if pricing and pricing["discount_type"] == "fixed_price" and pricing["fixed_price"]:
             price = float(pricing["fixed_price"])
             disc_rate = 0
+        elif pricing and pricing["discount_type"] == "rate":
+            disc_rate = float(pricing["discount_rate"])
+        else:
+            disc_rate = default_rate
         disc_amount = qty * price * disc_rate / 100
         amount = qty * price - disc_amount
         total += qty * price

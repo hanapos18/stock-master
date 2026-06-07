@@ -9,10 +9,12 @@ def load_sales(business_id: int, status: str = "",
                store_id: int = None) -> List[Dict]:
     """판매 목록을 조회합니다 (날짜/상태/매장 필터 지원)."""
     sql = (
-        "SELECT sa.*, st.name AS store_name, u.name AS created_by_name "
+        "SELECT sa.*, st.name AS store_name, u.name AS created_by_name, "
+        "wc.name AS client_name "
         "FROM stk_sales sa "
         "JOIN stk_stores st ON sa.store_id = st.id "
         "LEFT JOIN stk_users u ON sa.created_by = u.id "
+        "LEFT JOIN stk_wholesale_clients wc ON sa.client_id = wc.id "
         "WHERE sa.business_id = %s"
     )
     params: list = [business_id]
@@ -50,10 +52,12 @@ def load_sales_summary(business_id: int, date_from: str = "",
         f"SELECT "
         f"COUNT(*) AS total_count, "
         f"COALESCE(SUM(sa.total_amount), 0) AS total_amount, "
+        f"COALESCE(SUM(sa.discount_amount), 0) AS total_discount, "
+        f"COALESCE(SUM(sa.final_amount), 0) AS total_final, "
         f"SUM(CASE WHEN sa.status='confirmed' THEN 1 ELSE 0 END) AS confirmed_count, "
-        f"COALESCE(SUM(CASE WHEN sa.status='confirmed' THEN sa.total_amount ELSE 0 END), 0) AS confirmed_amount, "
+        f"COALESCE(SUM(CASE WHEN sa.status='confirmed' THEN sa.final_amount ELSE 0 END), 0) AS confirmed_amount, "
         f"SUM(CASE WHEN sa.status='draft' THEN 1 ELSE 0 END) AS draft_count, "
-        f"COALESCE(SUM(CASE WHEN sa.status='draft' THEN sa.total_amount ELSE 0 END), 0) AS draft_amount, "
+        f"COALESCE(SUM(CASE WHEN sa.status='draft' THEN sa.final_amount ELSE 0 END), 0) AS draft_amount, "
         f"SUM(CASE WHEN sa.status='cancelled' THEN 1 ELSE 0 END) AS cancelled_count "
         f"FROM stk_sales sa {where}",
         tuple(params),
@@ -79,6 +83,8 @@ def load_daily_settlement(business_id: int, date_from: str = "",
         f"SELECT sa.sale_date, "
         f"COUNT(*) AS sale_count, "
         f"COALESCE(SUM(sa.total_amount), 0) AS day_total, "
+        f"COALESCE(SUM(sa.discount_amount), 0) AS day_discount, "
+        f"COALESCE(SUM(sa.final_amount), 0) AS day_final, "
         f"SUM(CASE WHEN sa.status='confirmed' THEN 1 ELSE 0 END) AS confirmed, "
         f"SUM(CASE WHEN sa.status='draft' THEN 1 ELSE 0 END) AS draft "
         f"FROM stk_sales sa {where} "
@@ -90,8 +96,10 @@ def load_daily_settlement(business_id: int, date_from: str = "",
 def load_sale(sale_id: int) -> Optional[Dict]:
     """판매 상세를 조회합니다."""
     sale = fetch_one(
-        "SELECT sa.*, st.name AS store_name "
-        "FROM stk_sales sa JOIN stk_stores st ON sa.store_id = st.id "
+        "SELECT sa.*, st.name AS store_name, wc.name AS client_name "
+        "FROM stk_sales sa "
+        "JOIN stk_stores st ON sa.store_id = st.id "
+        "LEFT JOIN stk_wholesale_clients wc ON sa.client_id = wc.id "
         "WHERE sa.id = %s",
         (sale_id,),
     )
@@ -108,16 +116,25 @@ def load_sale(sale_id: int) -> Optional[Dict]:
 def save_sale(data: Dict, items: List[Dict]) -> int:
     """판매를 생성합니다."""
     sale_number = _generate_sale_number(data["business_id"])
+    client_id = data.get("client_id") or None
+    discount_rate = float(data.get("discount_rate", 0))
     sale_id = insert(
         "INSERT INTO stk_sales "
-        "(business_id, store_id, sale_number, sale_date, customer_name, memo, created_by) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        "(business_id, store_id, sale_number, sale_date, customer_name, client_id, discount_rate, memo, created_by) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
         (data["business_id"], data["store_id"], sale_number,
          data["sale_date"], data.get("customer_name", ""),
+         client_id, discount_rate,
          data.get("memo", ""), data.get("created_by")),
     )
     total = _save_sale_items(sale_id, items)
-    execute("UPDATE stk_sales SET total_amount = %s WHERE id = %s", (total, sale_id))
+    discount_amount = total * discount_rate / 100
+    final_amount = total - discount_amount
+    execute(
+        "UPDATE stk_sales SET total_amount=%s, discount_amount=%s, final_amount=%s WHERE id=%s",
+        (total, discount_amount, final_amount, sale_id),
+    )
+    print(f"판매 생성: sale_id={sale_id}, total={total}, disc_rate={discount_rate}%, disc_amt={discount_amount}, final={final_amount}")
     return sale_id
 
 

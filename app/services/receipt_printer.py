@@ -298,8 +298,9 @@ def build_sale_receipt(sale: Dict, store_name: str = "",
     printer.left().normal()
     printer.pair_line("No:", sale["sale_number"])
     printer.pair_line("Date:", str(sale["sale_date"]))
-    if sale.get("customer_name"):
-        printer.pair_line("Customer:", sale["customer_name"])
+    customer = sale.get("client_name") or sale.get("customer_name")
+    if customer:
+        printer.pair_line("Customer:", customer)
     printer.separator()
     # 상품 목록
     if is_narrow:
@@ -308,9 +309,17 @@ def build_sale_receipt(sale: Dict, store_name: str = "",
         _build_items_wide(printer, sale["line_items"])
     printer.separator()
     # 합계
-    printer.bold_on()
-    printer.pair_line("TOTAL:", format_number(float(sale["total_amount"])))
-    printer.bold_off()
+    discount_rate = float(sale.get("discount_rate", 0) or 0)
+    if discount_rate > 0:
+        printer.pair_line("Subtotal:", format_number(float(sale["total_amount"])))
+        printer.pair_line(f"Discount ({discount_rate}%):", "-" + format_number(float(sale.get("discount_amount", 0) or 0)))
+        printer.bold_on()
+        printer.pair_line("TOTAL:", format_number(float(sale.get("final_amount", 0) or sale["total_amount"])))
+        printer.bold_off()
+    else:
+        printer.bold_on()
+        printer.pair_line("TOTAL:", format_number(float(sale["total_amount"])))
+        printer.bold_off()
     printer.separator()
     # 푸터
     printer.newline(1)

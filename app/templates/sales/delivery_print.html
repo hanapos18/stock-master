@@ -25,7 +25,7 @@
   </div>
   <div class="header"><h2>DELIVERY LIST</h2><p>{{ sale.sale_number }}</p></div>
   <table class="info-table">
-    <tr><td><strong>Customer:</strong> {{ sale.customer_name or '-' }}</td><td><strong>Date:</strong> {{ sale.sale_date }}</td></tr>
+    <tr><td><strong>Customer:</strong> {{ sale.client_name or sale.customer_name or '-' }}</td><td><strong>Date:</strong> {{ sale.sale_date }}</td></tr>
     <tr><td><strong>Store:</strong> {{ sale.store_name }}</td><td></td></tr>
   </table>
   <table class="items-table"><thead><tr><th>#</th><th>Code</th><th>Product</th><th>Qty</th><th>Unit</th><th>Price</th><th>Amount</th></tr></thead><tbody>
@@ -34,7 +34,11 @@
       <td class="text-right">{{ i.quantity|fmt_qty }}</td><td>{{ i.unit }}</td>
       <td class="text-right">{{ i.unit_price|fmt_price }}</td><td class="text-right">{{ i.amount|fmt_price }}</td>
     </tr>{% endfor %}
-    <tr class="total-row"><td colspan="5"></td><td class="text-right">Total:</td><td class="text-right">{{ sale.total_amount|fmt_price }}</td></tr>
+    <tr class="total-row"><td colspan="5"></td><td class="text-right">Subtotal:</td><td class="text-right">{{ sale.total_amount|fmt_price }}</td></tr>
+    {% if sale.discount_rate and sale.discount_rate > 0 %}
+    <tr><td colspan="5"></td><td class="text-right">Discount ({{ sale.discount_rate }}%):</td><td class="text-right">-{{ sale.discount_amount|fmt_price }}</td></tr>
+    <tr class="total-row"><td colspan="5"></td><td class="text-right">Final Total:</td><td class="text-right">{{ sale.final_amount|fmt_price }}</td></tr>
+    {% endif %}
   </tbody></table>
   {% if sale.memo %}<p style="margin-top:15px"><strong>Note:</strong> {{ sale.memo }}</p>{% endif %}
   <div class="footer"><div class="sign-box">Prepared By</div><div class="sign-box">Received By</div></div>
