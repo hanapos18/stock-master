@@ -116,13 +116,17 @@ def webhook():
         result = pos_sync_controller.handle_store_sync(
             business_id, items,
         )
+    elif sync_type == "employee_sync":
+        result = pos_sync_controller.handle_employee_sync(
+            business_id, items,
+        )
     else:
         return jsonify({"success": False, "error": f"Unknown type: {sync_type}"}), 400
     # 동기화 상세 로그 기록
     for item in items:
-        menu_code = item.get("menu_code", "")
-        quantity = float(item.get("quantity", 0))
-        pos_record_id = int(item.get("pos_record_id", 0))
+        menu_code = item.get("menu_code") or item.get("mcode") or item.get("employee_id") or ""
+        quantity = float(item.get("quantity", 0) or 0)
+        pos_record_id = int(item.get("pos_record_id", 0) or 0)
         status = "success" if result["processed"] > 0 else "skipped"
         pos_sync_controller.log_sync_detail(
             business_id, f"webhook_{sync_type}", pos_record_id,

@@ -247,6 +247,78 @@ def handle_store_sync(business_id: int, items: List[Dict]) -> Dict:
     return result
 
 
+def handle_employee_sync(business_id: int, items: List[Dict]) -> Dict:
+    """POS 직원 등록/수정 -> StockMaster stk_users 동기화."""
+    from werkzeug.security import generate_password_hash
+    result = {"processed": 0, "skipped": 0, "created": 0, "updated": 0}
+    for item in items:
+        store_number = str(item.get("store_number", "")).strip()
+        username = str(item.get("employee_id") or item.get("ID") or item.get("username") or "").strip()
+        name = str(item.get("employee_name") or item.get("NAME") or item.get("name") or username).strip()
+        if not store_number or not username or not name:
+            result["skipped"] += 1
+            continue
+        store = fetch_one(
+            "SELECT id FROM stk_stores WHERE business_id = %s AND store_number = %s",
+            (business_id, store_number),
+        )
+        if not store:
+            result["skipped"] += 1
+            print(f"  직원 동기화 스킵: 매장 없음 {store_number} / {username}")
+            continue
+        role = _resolve_employee_role(item.get("grade") or item.get("GRADE") or item.get("role"))
+        is_active = _resolve_boolean(item.get("is_active", item.get("enabled", 1)))
+        password = str(item.get("password") or item.get("PW") or "").strip()
+        existing = fetch_one("SELECT id FROM stk_users WHERE username = %s", (username,))
+        if existing:
+            execute(
+                "UPDATE stk_users SET business_id = %s, name = %s, role = %s, "
+                "store_id = %s, is_active = %s WHERE id = %s",
+                (business_id, name, role, store["id"], is_active, existing["id"]),
+            )
+            if password:
+                execute(
+                    "UPDATE stk_users SET password_hash = %s WHERE id = %s",
+                    (generate_password_hash(password), existing["id"]),
+                )
+            result["updated"] += 1
+            print(f"  직원 업데이트: {username} - {name} ({role})")
+        else:
+            password_hash = generate_password_hash(password or "1234")
+            insert(
+                "INSERT INTO stk_users "
+                "(business_id, username, password_hash, name, role, store_id, is_active) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (business_id, username, password_hash, name, role, store["id"], is_active),
+            )
+            result["created"] += 1
+            print(f"  직원 생성: {username} - {name} ({role})")
+        result["processed"] += 1
+    return result
+
+
+def _resolve_employee_role(value) -> str:
+    """POS 등급 값을 StockMaster 역할로 변환."""
+    if str(value).lower() in ("admin", "manager", "staff"):
+        return str(value).lower()
+    try:
+        grade = int(value or 0)
+    except (TypeError, ValueError):
+        grade = 0
+    if grade >= 9:
+        return "admin"
+    if grade >= 7:
+        return "manager"
+    return "staff"
+
+
+def _resolve_boolean(value) -> int:
+    """여러 표현의 boolean 값을 0/1로 변환."""
+    if isinstance(value, str):
+        return 1 if value.lower() in ("1", "true", "yes", "on", "active") else 0
+    return 1 if value else 0
+
+
 def log_sync_detail(business_id: int, pos_table: str, pos_record_id: int,
                     sync_type: str, menu_code: str, quantity: float,
                     status: str = "success", error_message: str = "") -> None:
