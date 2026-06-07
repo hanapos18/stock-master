@@ -108,6 +108,14 @@ def webhook():
         result = pos_sync_controller.handle_loss(
             business_id, store_id, items,
         )
+    elif sync_type == "product_sync":
+        result = pos_sync_controller.handle_product_sync(
+            business_id, items,
+        )
+    elif sync_type == "store_sync":
+        result = pos_sync_controller.handle_store_sync(
+            business_id, items,
+        )
     else:
         return jsonify({"success": False, "error": f"Unknown type: {sync_type}"}), 400
     # 동기화 상세 로그 기록

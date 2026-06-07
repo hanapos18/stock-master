@@ -63,6 +63,8 @@ def ship_transfer(transfer_id: int, user_id: int) -> bool:
         "WHERE id=%s",
         (user_id, transfer_id),
     )
+    for item in items:
+        _sync_to_pos(item["product_id"], transfer["from_store_id"])
     print(f"🚚 이동 발송 완료: transfer_id={transfer_id}")
     return True
 
@@ -110,6 +112,10 @@ def receive_transfer(transfer_id: int, user_id: int,
         "WHERE id=%s",
         (user_id, transfer_id),
     )
+    for item in items:
+        recv_qty = received_map.get(item["id"], float(item["quantity"]))
+        if recv_qty > 0:
+            _sync_to_pos(item["product_id"], transfer["to_store_id"])
     print(f"✅ 이동 수령 완료: transfer_id={transfer_id}")
     return True
 
@@ -252,6 +258,17 @@ def load_store_inventory_summary(business_id: int) -> List[Dict]:
         "GROUP BY s.id ORDER BY s.is_warehouse DESC, s.name",
         (business_id,),
     )
+
+
+# ── POS 동기화 헬퍼 ──
+
+def _sync_to_pos(product_id: int, store_id: int) -> None:
+    """재고 변동 후 POS menulist 재고를 동기화합니다 (실패 시 무시)."""
+    try:
+        from app.controllers.pos_sync_controller import sync_inventory_to_pos
+        sync_inventory_to_pos(product_id, store_id)
+    except Exception as e:
+        print(f"POS 동기화 스킵: {e}")
 
 
 # ── 내부 헬퍼 ──

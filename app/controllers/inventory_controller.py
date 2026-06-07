@@ -145,12 +145,14 @@ def process_stock_in(product_id: int, store_id: int, quantity: float,
                      expiry_date: Optional[str] = None) -> int:
     """입고를 처리합니다 (유통기한별 로트 관리)."""
     _upsert_inventory(product_id, store_id, location, quantity, expiry_date=expiry_date)
-    return _record_transaction(
+    tx_id = _record_transaction(
         product_id=product_id, store_id=store_id, tx_type="in",
         to_location=location, quantity=quantity, unit_price=unit_price,
         reason=reason, user_id=user_id, reference_id=reference_id,
         reference_type=reference_type,
     )
+    _sync_to_pos(product_id, store_id)
+    return tx_id
 
 
 # ── 출고 (FEFO) ──
@@ -161,12 +163,14 @@ def process_stock_out(product_id: int, store_id: int, quantity: float,
                       reference_id: Optional[int] = None, reference_type: str = "") -> int:
     """출고를 처리합니다 (FEFO: 유통기한 빠른 것부터 차감)."""
     _fefo_deduct(product_id, store_id, location, quantity)
-    return _record_transaction(
+    tx_id = _record_transaction(
         product_id=product_id, store_id=store_id, tx_type="out",
         from_location=location, quantity=quantity, unit_price=unit_price,
         reason=reason, user_id=user_id, reference_id=reference_id,
         reference_type=reference_type,
     )
+    _sync_to_pos(product_id, store_id)
+    return tx_id
 
 
 def process_lot_stock_out(lot_deductions: List[Dict], store_id: int,
@@ -175,6 +179,7 @@ def process_lot_stock_out(lot_deductions: List[Dict], store_id: int,
                           reference_type: str = "") -> List[int]:
     """로트 지정 출고: 사용자가 선택한 로트별로 차감합니다."""
     tx_ids = []
+    synced_products = set()
     for lot in lot_deductions:
         inv_id = lot["inventory_id"]
         qty = float(lot["quantity"])
@@ -194,6 +199,9 @@ def process_lot_stock_out(lot_deductions: List[Dict], store_id: int,
             reference_id=reference_id, reference_type=reference_type,
         )
         tx_ids.append(tx_id)
+        synced_products.add(inv["product_id"])
+    for pid in synced_products:
+        _sync_to_pos(pid, store_id)
     return tx_ids
 
 
@@ -201,6 +209,7 @@ def process_lot_stock_move(lot_deductions: List[Dict], store_id: int,
                            to_location: str, user_id: Optional[int] = None) -> List[int]:
     """로트 지정 이동: 사용자가 선택한 로트별로 이동합니다."""
     tx_ids = []
+    synced_products = set()
     for lot in lot_deductions:
         inv_id = lot["inventory_id"]
         qty = float(lot["quantity"])
@@ -224,6 +233,9 @@ def process_lot_stock_move(lot_deductions: List[Dict], store_id: int,
             quantity=qty, user_id=user_id,
         )
         tx_ids.append(tx_id)
+        synced_products.add(inv["product_id"])
+    for pid in synced_products:
+        _sync_to_pos(pid, store_id)
     return tx_ids
 
 
@@ -252,10 +264,12 @@ def process_stock_adjust(product_id: int, store_id: int, new_quantity: float,
             )
         else:
             _set_inventory(product_id, store_id, location, new_quantity)
-    return _record_transaction(
+    tx_id = _record_transaction(
         product_id=product_id, store_id=store_id, tx_type="adjust",
         to_location=location, quantity=diff, reason=reason, user_id=user_id,
     )
+    _sync_to_pos(product_id, store_id)
+    return tx_id
 
 
 def process_stock_discard(product_id: int, store_id: int, quantity: float,
@@ -273,10 +287,12 @@ def process_stock_discard(product_id: int, store_id: int, quantity: float,
         _upsert_inventory(product_id, store_id, location, -quantity, expiry_date=expiry_date)
     else:
         _fefo_deduct(product_id, store_id, location, quantity)
-    return _record_transaction(
+    tx_id = _record_transaction(
         product_id=product_id, store_id=store_id, tx_type="discard",
         from_location=location, quantity=quantity, reason=reason, user_id=user_id,
     )
+    _sync_to_pos(product_id, store_id)
+    return tx_id
 
 
 def process_stock_move(product_id: int, store_id: int,
@@ -285,11 +301,13 @@ def process_stock_move(product_id: int, store_id: int,
     """위치 간 재고를 이동합니다."""
     _fefo_deduct(product_id, store_id, from_location, quantity)
     _upsert_inventory(product_id, store_id, to_location, quantity)
-    return _record_transaction(
+    tx_id = _record_transaction(
         product_id=product_id, store_id=store_id, tx_type="move",
         from_location=from_location, to_location=to_location,
         quantity=quantity, user_id=user_id,
     )
+    _sync_to_pos(product_id, store_id)
+    return tx_id
 
 
 def load_transactions(store_id: int, limit: int = 50, tx_type: str = "") -> List[Dict]:
@@ -307,6 +325,17 @@ def load_transactions(store_id: int, limit: int = 50, tx_type: str = "") -> List
     sql += " ORDER BY t.created_at DESC LIMIT %s"
     params.append(limit)
     return fetch_all(sql, tuple(params))
+
+
+# ── POS 동기화 헬퍼 ──
+
+def _sync_to_pos(product_id: int, store_id: int) -> None:
+    """재고 변동 후 POS menulist 재고를 동기화합니다 (실패 시 무시)."""
+    try:
+        from app.controllers.pos_sync_controller import sync_inventory_to_pos
+        sync_inventory_to_pos(product_id, store_id)
+    except Exception as e:
+        print(f"POS 동기화 스킵: {e}")
 
 
 # ── 내부 헬퍼 ──

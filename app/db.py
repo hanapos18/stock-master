@@ -86,3 +86,18 @@ def execute_pos_db(sql: str, params: tuple = (), db_name: Optional[str] = None) 
             return cur.fetchall()
     finally:
         conn.close()
+
+
+def write_pos_db(sql: str, params: tuple = (), db_name: Optional[str] = None) -> int:
+    """POS 데이터베이스에 INSERT/UPDATE/DELETE를 실행합니다."""
+    import config
+    pos_db = db_name or config.POS_DB_NAME
+    pos_config = {**_db_config, "database": pos_db}
+    conn = pymysql.connect(**pos_config)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            conn.commit()
+            return cur.rowcount
+    finally:
+        conn.close()

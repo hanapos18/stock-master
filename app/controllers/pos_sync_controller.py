@@ -168,6 +168,85 @@ def handle_loss(business_id: int, store_id: int,
     return result
 
 
+def handle_product_sync(business_id: int, items: List[Dict]) -> Dict:
+    """POS 상품 등록/수정 -> StockMaster stk_products 동기화."""
+    result = {"processed": 0, "skipped": 0, "created": 0, "updated": 0}
+    for item in items:
+        mcode = str(item.get("mcode", "")).strip()
+        mname = str(item.get("mname", "")).strip()
+        if not mcode or not mname:
+            result["skipped"] += 1
+            continue
+        sell_price = float(item.get("mprice1", 0) or 0)
+        cost_price = float(item.get("cost_price", 0) or 0)
+        barcode = item.get("barcode")
+        existing = fetch_one(
+            "SELECT id FROM stk_products WHERE business_id = %s AND code = %s",
+            (business_id, mcode),
+        )
+        if existing:
+            execute(
+                "UPDATE stk_products SET name = %s, sell_price = %s, unit_price = %s, "
+                "barcode = %s WHERE id = %s",
+                (mname, sell_price, cost_price, barcode, existing["id"]),
+            )
+            result["updated"] += 1
+            print(f"  상품 업데이트: {mcode} - {mname}")
+        else:
+            category_prefix = mcode[:2] if len(mcode) >= 2 else ""
+            category_id = None
+            if category_prefix:
+                cat = fetch_one(
+                    "SELECT id FROM stk_categories WHERE business_id = %s AND code = %s",
+                    (business_id, category_prefix),
+                )
+                if cat:
+                    category_id = cat["id"]
+            insert(
+                "INSERT INTO stk_products "
+                "(business_id, category_id, code, name, sell_price, unit_price, barcode, unit) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (business_id, category_id, mcode, mname, sell_price, cost_price, barcode, "ea"),
+            )
+            result["created"] += 1
+            print(f"  상품 생성: {mcode} - {mname}")
+        result["processed"] += 1
+    return result
+
+
+def handle_store_sync(business_id: int, items: List[Dict]) -> Dict:
+    """POS 매장 등록/수정 -> StockMaster stk_stores 동기화."""
+    result = {"processed": 0, "created": 0, "updated": 0}
+    for item in items:
+        store_number = str(item.get("store_number", "")).strip()
+        store_name = str(item.get("store_name", "")).strip()
+        if not store_number or not store_name:
+            continue
+        address = item.get("address", "")
+        phone = item.get("phone", "")
+        existing = fetch_one(
+            "SELECT id FROM stk_stores WHERE business_id = %s AND store_number = %s",
+            (business_id, store_number),
+        )
+        if existing:
+            execute(
+                "UPDATE stk_stores SET name = %s, address = %s, phone = %s WHERE id = %s",
+                (store_name, address, phone, existing["id"]),
+            )
+            result["updated"] += 1
+            print(f"  매장 업데이트: {store_number} - {store_name}")
+        else:
+            insert(
+                "INSERT INTO stk_stores (business_id, name, store_number, address, phone) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (business_id, store_name, store_number, address, phone),
+            )
+            result["created"] += 1
+            print(f"  매장 생성: {store_number} - {store_name}")
+        result["processed"] += 1
+    return result
+
+
 def log_sync_detail(business_id: int, pos_table: str, pos_record_id: int,
                     sync_type: str, menu_code: str, quantity: float,
                     status: str = "success", error_message: str = "") -> None:
@@ -385,13 +464,51 @@ def sync_stock_transactions_from_pos(business_id: int, store_id: int,
             "errors": result_in["errors"] + result_out["errors"], "total": len(rows)}
 
 
+def sync_stores_from_pos(business_id: int, pos_db_name: str = "") -> Dict:
+    """POS store_info -> stk_stores 동기화 (신규 추가, 정보 업데이트)."""
+    import config
+    db_name = pos_db_name or config.POS_DB_NAME
+    pos_stores = execute_pos_db(
+        "SELECT store_number, store_name, address, phone FROM store_info WHERE enabled = 1",
+        db_name=db_name,
+    )
+    result = {"synced": 0, "created": 0, "updated": 0}
+    for ps in pos_stores:
+        store_number = ps["store_number"]
+        store_name = ps["store_name"]
+        address = ps.get("address", "")
+        phone = ps.get("phone", "")
+        existing = fetch_one(
+            "SELECT id, name FROM stk_stores WHERE business_id = %s AND store_number = %s",
+            (business_id, store_number),
+        )
+        if existing:
+            execute(
+                "UPDATE stk_stores SET name = %s, address = %s, phone = %s WHERE id = %s",
+                (store_name, address, phone, existing["id"]),
+            )
+            result["updated"] += 1
+        else:
+            insert(
+                "INSERT INTO stk_stores (business_id, name, store_number, address, phone) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (business_id, store_name, store_number, address, phone),
+            )
+            result["created"] += 1
+        result["synced"] += 1
+    print(f"매장 동기화: {result['synced']}건 (신규 {result['created']}, 업데이트 {result['updated']})")
+    return result
+
+
 def run_full_sync(business_id: int, business_type: str,
                   store_id: int, pos_db_name: str = "") -> Dict:
     """전체 폴링 동기화를 실행합니다 (마스터 + 거래)."""
+    store_result = sync_stores_from_pos(business_id, pos_db_name)
     master_result = sync_master_from_pos(business_id, pos_db_name)
     sales_result = sync_sales_from_pos(business_id, business_type, store_id, pos_db_name)
     stock_result = sync_stock_transactions_from_pos(business_id, store_id, pos_db_name)
     return {
+        "stores": store_result,
         "master": master_result,
         "sales": sales_result,
         "stock_transactions": stock_result,
@@ -527,6 +644,56 @@ def _convert_baekwon_date(date_str: str) -> str:
         except (ValueError, IndexError):
             pass
     return date_str
+
+
+def sync_inventory_to_pos(product_id: int, store_id: int) -> bool:
+    """StockMaster 재고를 POS menulist.minventory에 동기화합니다."""
+    from app.db import write_pos_db
+    product = fetch_one(
+        "SELECT code FROM stk_products WHERE id = %s", (product_id,),
+    )
+    if not product or not product["code"]:
+        return False
+    mcode = product["code"]
+    total_row = fetch_one(
+        "SELECT COALESCE(SUM(quantity), 0) AS total_qty "
+        "FROM stk_inventory WHERE product_id = %s AND store_id = %s",
+        (product_id, store_id),
+    )
+    total_qty = int(float(total_row["total_qty"])) if total_row else 0
+    try:
+        affected = write_pos_db(
+            "UPDATE menulist SET minventory = %s WHERE mcode = %s",
+            (total_qty, mcode),
+        )
+        if affected > 0:
+            print(f"POS 재고 동기화: {mcode} -> {total_qty}")
+        return affected > 0
+    except Exception as e:
+        print(f"POS 재고 동기화 실패 ({mcode}): {e}")
+        return False
+
+
+def sync_product_to_pos(product_id: int) -> bool:
+    """StockMaster 상품 정보를 POS menulist에 동기화합니다 (가격, 원가)."""
+    from app.db import write_pos_db
+    product = fetch_one(
+        "SELECT code, name, sell_price, unit_price FROM stk_products WHERE id = %s",
+        (product_id,),
+    )
+    if not product or not product["code"]:
+        return False
+    try:
+        affected = write_pos_db(
+            "UPDATE menulist SET mprice1 = %s, cost_price = %s WHERE mcode = %s",
+            (float(product["sell_price"]), float(product["unit_price"]), product["code"]),
+        )
+        if affected > 0:
+            print(f"POS 상품 동기화: {product['code']} price={product['sell_price']}")
+        return affected > 0
+    except Exception as e:
+        print(f"POS 상품 동기화 실패 ({product['code']}): {e}")
+        return False
 
 
 def load_sync_status(business_id: int) -> Dict:
