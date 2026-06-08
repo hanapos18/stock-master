@@ -5,10 +5,10 @@
 <div class="card border-0 shadow-sm" style="max-width:600px;">
   <div class="card-body">
     {% if is_restaurant %}
-    <!-- 식당: 전체 상품 한번에 실사 -->
+    <!-- 식당: 위치별 실사 -->
     <div class="alert alert-info mb-3">
       <i class="bi bi-info-circle me-1"></i>
-      <strong>Restaurant Mode:</strong> All products will be loaded on a single page for complete inventory count. No items will be missed.
+      <strong>Restaurant Mode:</strong> Count by location (Kitchen / Warehouse). After all locations are counted, use <strong>Combined Review</strong> to review totals and approve together.
     </div>
     <form method="post">
       <input type="hidden" name="mode" value="full">
@@ -17,11 +17,22 @@
         <input type="date" name="count_date" class="form-control" required>
       </div>
       <div class="mb-3">
-        <label class="form-label">Memo</label>
-        <textarea name="memo" class="form-control" rows="2" placeholder="Full inventory count"></textarea>
+        <label class="form-label">Location *</label>
+        <select name="location" class="form-select" required>
+          <option value="">-- Select Location --</option>
+          {% for code, label in locations %}
+          <option value="{{ code }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+        <small class="text-muted">Create separate counts for Kitchen and Warehouse, then review combined totals.</small>
       </div>
-      <button type="submit" class="btn btn-primary"><i class="bi bi-clipboard-check me-1"></i>Start Full Count</button>
+      <div class="mb-3">
+        <label class="form-label">Memo</label>
+        <textarea name="memo" class="form-control" rows="2" placeholder="e.g. Monthly count - kitchen"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-clipboard-check me-1"></i>Start Count</button>
       <a href="{{ url_for('stock_count.list_counts') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+      <a href="{{ url_for('stock_count.combined_review') }}" class="btn btn-outline-info ms-2"><i class="bi bi-layers me-1"></i>Combined Review</a>
     </form>
     {% else %}
     <!-- 마트: 카테고리별 실사 -->

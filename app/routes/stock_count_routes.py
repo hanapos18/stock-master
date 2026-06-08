@@ -29,27 +29,31 @@ def list_counts():
 @stock_count_bp.route("/create", methods=["GET", "POST"])
 @login_required
 def create_count():
-    """실사 보고 생성 (식당: 전체, 마트: 카테고리별)"""
+    """실사 보고 생성 (식당: 전체/위치별, 마트: 카테고리별)"""
     business_id = session["business"]["id"]
     store = session.get("store")
     if request.method == "POST":
         mode = request.form.get("mode", "category")
+        location = request.form.get("location") or None
         if mode == "full":
             data = {
                 "business_id": business_id,
                 "store_id": store["id"],
                 "count_date": request.form["count_date"],
+                "location": location,
                 "memo": request.form.get("memo", ""),
                 "created_by": session["user"]["id"],
             }
             count_id = stock_count_controller.create_full_stock_count(data)
-            print(f"전체 실사 생성: count_id={count_id}")
-            flash("Full stock count created - enter actual quantities", "success")
+            loc_label = location or "all"
+            print(f"위치별 실사 생성: count_id={count_id}, location={loc_label}")
+            flash(f"Stock count created ({loc_label}) - enter actual quantities", "success")
         else:
             data = {
                 "business_id": business_id,
                 "store_id": store["id"],
                 "count_date": request.form["count_date"],
+                "location": location,
                 "category_id": request.form.get("category_id") or None,
                 "memo": request.form.get("memo", ""),
                 "created_by": session["user"]["id"],
@@ -59,7 +63,8 @@ def create_count():
         return redirect(url_for("stock_count.edit_count", count_id=count_id))
     categories = category_controller.load_categories(business_id)
     return render_template("stock-count/create.html", categories=categories,
-                           is_restaurant=_is_restaurant())
+                           is_restaurant=_is_restaurant(),
+                           locations=stock_count_controller.STOCK_LOCATIONS)
 
 
 @stock_count_bp.route("/<int:count_id>")
@@ -73,7 +78,7 @@ def view_count(count_id: int):
 @stock_count_bp.route("/<int:count_id>/edit", methods=["GET", "POST"])
 @login_required
 def edit_count(count_id: int):
-    """실사 수량 입력/수정"""
+    """실사 수량 입력/수정 (사유 선택 포함)"""
     count = stock_count_controller.load_stock_count(count_id)
     if request.method == "POST":
         items = []
@@ -81,15 +86,16 @@ def edit_count(count_id: int):
             if key.startswith("actual_"):
                 item_id = int(key.replace("actual_", ""))
                 memo_key = f"memo_{item_id}"
+                reason_key = f"reason_{item_id}"
                 items.append({
                     "id": item_id,
                     "actual_quantity": float(val),
+                    "adjust_reason": request.form.get(reason_key, ""),
                     "memo": request.form.get(memo_key, ""),
                 })
         stock_count_controller.update_stock_count_items(count_id, items)
         flash("Stock count updated", "success")
         return redirect(url_for("stock_count.view_count", count_id=count_id))
-    # 카테고리별 그룹핑 (식당 전체 실사용)
     grouped = {}
     if count and count.get("line_items"):
         for item in count["line_items"]:
@@ -97,7 +103,8 @@ def edit_count(count_id: int):
             if cat not in grouped:
                 grouped[cat] = []
             grouped[cat].append(item)
-    return render_template("stock-count/edit.html", count=count, grouped=grouped)
+    return render_template("stock-count/edit.html", count=count, grouped=grouped,
+                           adjust_reasons=stock_count_controller.ADJUST_REASONS)
 
 
 @stock_count_bp.route("/<int:count_id>/approve", methods=["POST"])
@@ -110,6 +117,38 @@ def approve_count(count_id: int):
     else:
         flash("Cannot approve this stock count", "danger")
     return redirect(url_for("stock_count.view_count", count_id=count_id))
+
+
+@stock_count_bp.route("/combined-review")
+@login_required
+def combined_review():
+    """합산 리뷰: 같은 날짜의 위치별 실사를 합산하여 확인"""
+    business_id = session["business"]["id"]
+    store = session.get("store")
+    count_date = request.args.get("count_date", dt_date.today().strftime("%Y-%m-%d"))
+    review = stock_count_controller.load_combined_review(
+        business_id, store["id"], count_date
+    )
+    return render_template("stock-count/combined_review.html",
+                           review=review, count_date=count_date,
+                           locations=stock_count_controller.STOCK_LOCATIONS)
+
+
+@stock_count_bp.route("/combined-approve", methods=["POST"])
+@login_required
+def combined_approve():
+    """합산 리뷰 후 일괄 승인"""
+    business_id = session["business"]["id"]
+    store = session.get("store")
+    count_date = request.form["count_date"]
+    result = stock_count_controller.approve_combined_counts(
+        business_id, store["id"], count_date, user_id=session["user"]["id"]
+    )
+    if result:
+        flash("All location counts approved - inventory adjusted", "success")
+    else:
+        flash("No pending counts to approve", "danger")
+    return redirect(url_for("stock_count.combined_review", count_date=count_date))
 
 
 @stock_count_bp.route("/coverage")

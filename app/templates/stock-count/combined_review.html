@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Combined Stock Count Review{% endblock %}
+{% block page_title %}Combined Review — {{ count_date }}{% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body">
+    <!-- 날짜 선택 -->
+    <form class="row g-2 align-items-end mb-3">
+      <div class="col-auto">
+        <label class="form-label small">Count Date</label>
+        <input type="date" name="count_date" class="form-control form-control-sm" value="{{ count_date }}">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-outline-primary">Load</button>
+      </div>
+    </form>
+
+    {% if not review.counts %}
+    <div class="alert alert-warning">
+      <i class="bi bi-exclamation-triangle me-1"></i>
+      No stock counts found for <strong>{{ count_date }}</strong>. Create location-based counts first.
+    </div>
+    {% else %}
+
+    <!-- 위치별 실사 상태 요약 -->
+    <h6 class="mb-2"><i class="bi bi-geo-alt me-1"></i>Location Counts</h6>
+    <div class="row g-2 mb-3">
+      {% for c in review.counts %}
+      <div class="col-auto">
+        <div class="border rounded p-2 {{ 'border-success' if c.status == 'approved' else 'border-warning' }}">
+          <span class="badge {{ 'bg-success' if c.status == 'approved' else 'bg-warning text-dark' }} me-1">
+            {{ c.location|upper if c.location else 'ALL' }}
+          </span>
+          <span class="badge {{ 'bg-success' if c.status == 'approved' else 'bg-secondary' }}">{{ c.status }}</span>
+          {% if c.created_by_name %}<small class="text-muted ms-1">by {{ c.created_by_name }}</small>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if review.has_approved %}
+    <div class="alert alert-success">
+      <i class="bi bi-check-circle me-1"></i> All counts have been approved. Inventory is adjusted.
+    </div>
+    {% endif %}
+
+    <!-- 합산 요약 -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <div class="border rounded p-3 text-center">
+          <div class="text-muted small">Total System</div>
+          <div class="fs-5 fw-bold">{{ "%.2f"|format(review.total_system) }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="border rounded p-3 text-center">
+          <div class="text-muted small">Total Actual</div>
+          <div class="fs-5 fw-bold">{{ "%.2f"|format(review.total_actual) }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="border rounded p-3 text-center {{ 'border-danger' if review.total_diff < 0 else 'border-success' if review.total_diff > 0 else '' }}">
+          <div class="text-muted small">Total Difference</div>
+          <div class="fs-5 fw-bold {{ 'text-danger' if review.total_diff < 0 else 'text-success' if review.total_diff > 0 else '' }}">
+            {{ "%+.2f"|format(review.total_diff) }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 상품별 합산 테이블 -->
+    <h6 class="mb-2"><i class="bi bi-table me-1"></i>Product Summary (All Locations Combined)</h6>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover">
+        <thead class="table-light">
+          <tr>
+            <th>Product</th>
+            <th>Unit</th>
+            {% for loc in review.location_list %}
+            <th class="text-center" style="min-width:120px">
+              <span class="badge bg-outline-secondary border">{{ loc|upper }}</span><br>
+              <small class="text-muted">Sys → Act</small>
+            </th>
+            {% endfor %}
+            <th class="text-center">Total System</th>
+            <th class="text-center">Total Actual</th>
+            <th class="text-center">Diff</th>
+            <th>Memo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set current_cat = namespace(name='') %}
+          {% for item in review.combined_items %}
+          {% if item.category_name != current_cat.name %}
+          {% set current_cat.name = item.category_name %}
+          <tr class="table-secondary">
+            <td colspan="{{ 5 + review.location_list|length }}"><strong>{{ item.category_name }}</strong></td>
+          </tr>
+          {% endif %}
+          <tr class="{{ 'table-danger bg-opacity-10' if item.total_diff < -0.01 else 'table-success bg-opacity-10' if item.total_diff > 0.01 else '' }}">
+            <td>
+              <code class="me-1">{{ item.product_code }}</code>
+              {{ item.product_name }}
+            </td>
+            <td>{{ item.unit }}</td>
+            {% for loc in review.location_list %}
+            {% set loc_data = item.locations.get(loc, {}) %}
+            <td class="text-center small">
+              {% if loc_data %}
+              {{ "%.1f"|format(loc_data.system_quantity) }} → <strong>{{ "%.1f"|format(loc_data.actual_quantity) }}</strong>
+              {% if loc_data.difference != 0 %}
+              <br><span class="{{ 'text-danger' if loc_data.difference < 0 else 'text-success' }}">
+                ({{ "%+.1f"|format(loc_data.difference) }})
+              </span>
+              {% endif %}
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            {% endfor %}
+            <td class="text-center">{{ "%.2f"|format(item.total_system) }}</td>
+            <td class="text-center fw-bold">{{ "%.2f"|format(item.total_actual) }}</td>
+            <td class="text-center fw-bold {{ 'text-danger' if item.total_diff < -0.01 else 'text-success' if item.total_diff > 0.01 else '' }}">
+              {{ "%+.2f"|format(item.total_diff) }}
+            </td>
+            <td class="small">
+              {% for loc, ld in item.locations.items() %}
+              {% if ld.memo %}<span class="badge bg-light text-dark border me-1">{{ loc }}: {{ ld.memo }}</span>{% endif %}
+              {% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 일괄 승인 버튼 -->
+    {% if review.is_all_ready %}
+    <div class="sticky-bottom bg-white py-3 border-top">
+      <form method="post" action="{{ url_for('stock_count.combined_approve') }}"
+            onsubmit="return confirm('Approve all location counts and adjust inventory?');">
+        <input type="hidden" name="count_date" value="{{ count_date }}">
+        <button type="submit" class="btn btn-success btn-lg">
+          <i class="bi bi-check-circle me-1"></i>Approve All & Adjust Inventory
+        </button>
+        <span class="text-muted ms-3">{{ review.counts|length }} location counts will be approved</span>
+      </form>
+    </div>
+    {% elif not review.has_approved %}
+    <div class="alert alert-info mt-3">
+      <i class="bi bi-info-circle me-1"></i>
+      Some counts are not ready. Make sure all location counts are saved (status: draft) before approving.
+    </div>
+    {% endif %}
+
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

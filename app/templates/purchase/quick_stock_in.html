@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Quick Stock In - Hana StockMaster{% endblock %}
+{% block page_title %}Quick Stock In{% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <p class="text-muted mb-3">Scan barcode or select purchase variant to stock in. Cost input is optional.</p>
+
+    <form method="post" id="quickStockForm">
+      <div class="row g-3 mb-4">
+        <!-- Barcode Scanner Input -->
+        <div class="col-md-6">
+          <label class="form-label"><i class="bi bi-upc-scan me-1"></i>Barcode</label>
+          <input type="text" id="barcodeInput" class="form-control form-control-lg"
+                 placeholder="Scan or type barcode..." autocomplete="off" autofocus>
+          <div id="barcodeStatus" class="form-text"></div>
+        </div>
+
+        <!-- Manual Variant Select -->
+        <div class="col-md-6">
+          <label class="form-label">Purchase Variant</label>
+          <select name="variant_id" id="variantSelect" class="form-select form-select-lg" required>
+            <option value="">-- Select --</option>
+            {% for v in variants %}
+            <option value="{{ v.id }}"
+                    data-product="{{ v.product_name }}"
+                    data-unit="{{ v.base_unit }}"
+                    data-punit="{{ v.purchase_unit }}"
+                    data-rate="{{ v.conversion_rate }}"
+                    data-lastprice="{{ v.last_purchase_price or '' }}"
+                    data-barcode="{{ v.barcode or '' }}">
+              {{ v.product_name }} — {{ v.name }} (1{{ v.purchase_unit }}={{ v.conversion_rate }}{{ v.base_unit }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Selected Info Display -->
+      <div id="variantInfo" class="alert alert-info d-none mb-3">
+        <strong id="infoProductName"></strong>
+        <span class="text-muted ms-2" id="infoConversion"></span>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <label class="form-label">Quantity *</label>
+          <div class="input-group">
+            <input type="number" name="purchase_qty" id="purchaseQty"
+                   class="form-control" min="0.01" step="any" required placeholder="0">
+            <span class="input-group-text" id="purchaseUnitLabel">ea</span>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Total Cost <span class="text-muted">(optional)</span></label>
+          <input type="number" name="total_cost" id="totalCost"
+                 class="form-control" min="0" step="any" placeholder="Leave empty to skip">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Expiry Date</label>
+          <input type="date" name="expiry_date" class="form-control">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Reason / Memo</label>
+          <input type="text" name="reason" class="form-control" placeholder="Optional">
+        </div>
+      </div>
+
+      <!-- Calculation Preview -->
+      <div id="calcPreview" class="card bg-light border-0 mb-3 d-none">
+        <div class="card-body py-2">
+          <div class="row text-center">
+            <div class="col">
+              <small class="text-muted">Base Qty</small>
+              <div class="fw-bold" id="previewBaseQty">-</div>
+            </div>
+            <div class="col">
+              <small class="text-muted">Unit Cost</small>
+              <div class="fw-bold" id="previewUnitCost">-</div>
+            </div>
+            <div class="col">
+              <small class="text-muted">Total</small>
+              <div class="fw-bold" id="previewTotal">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg">
+        <i class="bi bi-box-arrow-in-down me-1"></i>Stock In
+      </button>
+      <a href="{{ url_for('purchase.list_variants') }}" class="btn btn-outline-secondary ms-2">
+        Manage Variants
+      </a>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const barcodeInput = document.getElementById('barcodeInput');
+const variantSelect = document.getElementById('variantSelect');
+const variantInfo = document.getElementById('variantInfo');
+const purchaseQty = document.getElementById('purchaseQty');
+const totalCost = document.getElementById('totalCost');
+const calcPreview = document.getElementById('calcPreview');
+let currentRate = 1;
+let currentBaseUnit = 'ea';
+
+barcodeInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    lookupBarcode(this.value.trim());
+  }
+});
+
+function lookupBarcode(barcode) {
+  if (!barcode) return;
+  const status = document.getElementById('barcodeStatus');
+  fetch('/purchases/api/variant-by-barcode?barcode=' + encodeURIComponent(barcode))
+    .then(r => r.json())
+    .then(data => {
+      if (data.found) {
+        variantSelect.value = data.variant.id;
+        variantSelect.dispatchEvent(new Event('change'));
+        status.innerHTML = '<span class="text-success">Found: ' + data.variant.name + '</span>';
+        purchaseQty.focus();
+      } else {
+        status.innerHTML = '<span class="text-danger">Not found: ' + barcode + '</span>';
+      }
+    });
+}
+
+variantSelect.addEventListener('change', function() {
+  const opt = this.options[this.selectedIndex];
+  if (!this.value) {
+    variantInfo.classList.add('d-none');
+    calcPreview.classList.add('d-none');
+    return;
+  }
+  const product = opt.dataset.product;
+  const rate = parseFloat(opt.dataset.rate);
+  const punit = opt.dataset.punit;
+  const baseUnit = opt.dataset.unit;
+  const lastPrice = opt.dataset.lastprice;
+  currentRate = rate;
+  currentBaseUnit = baseUnit;
+  document.getElementById('infoProductName').textContent = product;
+  document.getElementById('infoConversion').textContent =
+    '1 ' + punit + ' = ' + rate + ' ' + baseUnit;
+  document.getElementById('purchaseUnitLabel').textContent = punit;
+  variantInfo.classList.remove('d-none');
+  if (lastPrice) {
+    totalCost.placeholder = 'Last: ' + parseFloat(lastPrice).toLocaleString() + '/' + punit;
+  } else {
+    totalCost.placeholder = 'Leave empty to skip';
+  }
+  updatePreview();
+});
+
+purchaseQty.addEventListener('input', updatePreview);
+totalCost.addEventListener('input', updatePreview);
+
+function updatePreview() {
+  const qty = parseFloat(purchaseQty.value) || 0;
+  const cost = parseFloat(totalCost.value) || 0;
+  if (qty <= 0) {
+    calcPreview.classList.add('d-none');
+    return;
+  }
+  calcPreview.classList.remove('d-none');
+  const baseQty = qty * currentRate;
+  document.getElementById('previewBaseQty').textContent =
+    baseQty.toLocaleString() + ' ' + currentBaseUnit;
+  if (cost > 0) {
+    const unitCost = cost / baseQty;
+    document.getElementById('previewUnitCost').textContent =
+      unitCost.toFixed(2) + '/' + currentBaseUnit;
+    document.getElementById('previewTotal').textContent =
+      cost.toLocaleString();
+  } else {
+    document.getElementById('previewUnitCost').textContent = 'No change';
+    document.getElementById('previewTotal').textContent = '-';
+  }
+}
+</script>
+{% endblock %}

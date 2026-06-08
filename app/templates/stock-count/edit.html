@@ -32,7 +32,7 @@
         <table class="table table-sm table-hover"><thead class="table-light"><tr>
           <th style="width:80px">Code</th><th>Product</th><th style="width:60px">Unit</th>
           <th style="width:90px">System</th><th style="width:110px">Actual</th>
-          <th style="width:80px">Diff</th><th style="width:150px">Memo</th>
+          <th style="width:80px">Diff</th><th style="width:130px">Reason</th><th style="width:130px">Memo</th>
         </tr></thead><tbody>
           {% for i in items %}<tr>
             <td><code>{{ i.product_code }}</code></td>
@@ -47,6 +47,14 @@
             <td class="diff text-end {{ 'text-danger fw-bold' if (i.actual_quantity|float - i.system_quantity|float) != 0 }}">
               {{ (i.actual_quantity|float - i.system_quantity|float)|fmt_qty }}
             </td>
+            <td>
+              <select name="reason_{{ i.id }}" class="form-select form-select-sm reason-select">
+                <option value="">--</option>
+                {% for code, label in adjust_reasons %}
+                <option value="{{ code }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </td>
             <td><input type="text" name="memo_{{ i.id }}" class="form-control form-control-sm" value="{{ i.memo or '' }}" placeholder="..."></td>
           </tr>{% endfor %}
         </tbody></table>
@@ -57,7 +65,7 @@
       <table class="table table-sm table-hover"><thead class="table-light"><tr>
         <th style="width:80px">Code</th><th>Product</th><th style="width:60px">Unit</th>
         <th style="width:90px">System</th><th style="width:110px">Actual</th>
-        <th style="width:80px">Diff</th><th style="width:150px">Memo</th>
+        <th style="width:80px">Diff</th><th style="width:130px">Reason</th><th style="width:130px">Memo</th>
       </tr></thead><tbody>
         {% for i in count.line_items %}<tr>
           <td><code>{{ i.product_code }}</code></td>
@@ -71,6 +79,14 @@
           </td>
           <td class="diff text-end {{ 'text-danger fw-bold' if (i.actual_quantity|float - i.system_quantity|float) != 0 }}">
             {{ (i.actual_quantity|float - i.system_quantity|float)|fmt_qty }}
+          </td>
+          <td>
+            <select name="reason_{{ i.id }}" class="form-select form-select-sm reason-select">
+              <option value="">--</option>
+              {% for code, label in adjust_reasons %}
+              <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}
+            </select>
           </td>
           <td><input type="text" name="memo_{{ i.id }}" class="form-control form-control-sm" value="{{ i.memo or '' }}" placeholder="..."></td>
         </tr>{% endfor %}
@@ -90,12 +106,16 @@
 function updateDiff(el, systemQty) {
   const actual = parseFloat(el.value) || 0;
   const diff = actual - systemQty;
-  const td = el.closest('tr').querySelector('.diff');
+  const tr = el.closest('tr');
+  const td = tr.querySelector('.diff');
+  const reasonSelect = tr.querySelector('.reason-select');
   td.textContent = diff.toFixed(2);
   if (diff !== 0) {
     td.classList.add('text-danger', 'fw-bold');
+    if (reasonSelect) reasonSelect.classList.add('border-warning');
   } else {
     td.classList.remove('text-danger', 'fw-bold');
+    if (reasonSelect) reasonSelect.classList.remove('border-warning');
   }
 }
 </script>

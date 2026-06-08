@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Purchase Variants - Hana StockMaster{% endblock %}
+{% block page_title %}Purchase Variants{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <p class="text-muted mb-0">Manage purchase items (barcode packages) that map to inventory products.</p>
+  <div>
+    <a href="{{ url_for('purchase.create_variant') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg me-1"></i>New Variant
+    </a>
+    <a href="{{ url_for('purchase.quick_stock_in') }}" class="btn btn-outline-success ms-1">
+      <i class="bi bi-box-arrow-in-down me-1"></i>Quick Stock In
+    </a>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Inventory Product</th>
+          <th>Variant Name</th>
+          <th>Barcode</th>
+          <th>Purchase Unit</th>
+          <th class="text-center">Rate</th>
+          <th>Supplier</th>
+          <th class="text-end">Last Price</th>
+          <th style="width:80px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in variants %}
+        <tr>
+          <td><strong>{{ v.product_name }}</strong> <small class="text-muted">({{ v.base_unit }})</small></td>
+          <td>{{ v.name }}</td>
+          <td>{% if v.barcode %}<code>{{ v.barcode }}</code>{% else %}<span class="text-muted">-</span>{% endif %}</td>
+          <td>{{ v.purchase_unit }}</td>
+          <td class="text-center">
+            <span class="badge bg-info">1 {{ v.purchase_unit }} = {{ v.conversion_rate|fmt_qty }} {{ v.base_unit }}</span>
+          </td>
+          <td>{{ v.supplier_name or '-' }}</td>
+          <td class="text-end">{{ v.last_purchase_price|fmt_price if v.last_purchase_price else '-' }}</td>
+          <td>
+            <a href="{{ url_for('purchase.edit_variant', variant_id=v.id) }}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-pencil"></i>
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No purchase variants registered yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

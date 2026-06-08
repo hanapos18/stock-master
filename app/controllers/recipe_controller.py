@@ -92,17 +92,24 @@ def load_pos_menu_items(pos_db_name: str) -> List[Dict]:
 
 
 def calculate_recipe_cost(recipe_id: int) -> Dict:
-    """레시피 원가를 계산합니다."""
+    """레시피 원가를 계산합니다 (이동평균원가 우선, 없으면 unit_price 폴백)."""
     recipe = load_recipe(recipe_id)
     if not recipe:
         return {"total_cost": 0, "items": []}
     items_with_cost = []
     total_cost = 0.0
     for item in recipe["ingredients"]:
-        product = fetch_one("SELECT unit_price FROM stk_products WHERE id = %s", (item["product_id"],))
-        cost = float(item["quantity"]) * float(product["unit_price"]) if product else 0
+        product = fetch_one(
+            "SELECT unit_price, avg_unit_cost FROM stk_products WHERE id = %s",
+            (item["product_id"],),
+        )
+        if not product:
+            items_with_cost.append({**item, "cost": 0})
+            continue
+        unit_cost = float(product["avg_unit_cost"] or 0) or float(product["unit_price"] or 0)
+        cost = float(item["quantity"]) * unit_cost
         total_cost += cost
-        items_with_cost.append({**item, "cost": cost})
+        items_with_cost.append({**item, "cost": cost, "unit_cost": unit_cost})
     return {"total_cost": total_cost, "items": items_with_cost}
 
 

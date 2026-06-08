@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if variant else 'New' }} Purchase Variant - Hana StockMaster{% endblock %}
+{% block page_title %}{{ 'Edit' if variant else 'New' }} Purchase Variant{% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <form method="post">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Inventory Product *</label>
+          <select name="product_id" class="form-select" required>
+            <option value="">-- Select product --</option>
+            {% for p in products %}
+            <option value="{{ p.id }}" {% if variant and variant.product_id == p.id %}selected{% endif %}>
+              {{ p.name }} ({{ p.code }}) [{{ p.unit }}]
+            </option>
+            {% endfor %}
+          </select>
+          <div class="form-text">The base inventory item this variant converts into.</div>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Variant Name *</label>
+          <input type="text" name="name" class="form-control" required
+                 placeholder="e.g. Shin Ramyun 40-pack Export Box"
+                 value="{{ variant.name if variant else '' }}">
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Barcode</label>
+          <input type="text" name="barcode" class="form-control"
+                 placeholder="Scan or type (optional)"
+                 value="{{ variant.barcode if variant and variant.barcode else '' }}">
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Purchase Unit *</label>
+          <input type="text" name="purchase_unit" class="form-control" required
+                 placeholder="e.g. box, bottle, bag"
+                 value="{{ variant.purchase_unit if variant else 'ea' }}">
+          <div class="form-text">Unit you buy in (box, bottle, bag...)</div>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Conversion Rate *</label>
+          <input type="number" name="conversion_rate" class="form-control" required
+                 min="0.0001" step="any" placeholder="e.g. 40"
+                 value="{{ variant.conversion_rate if variant else '' }}">
+          <div class="form-text">1 purchase unit = ? base units</div>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Supplier</label>
+          <select name="supplier_id" class="form-select">
+            <option value="">-- None --</option>
+            {% for s in suppliers %}
+            <option value="{{ s.id }}" {% if variant and variant.supplier_id == s.id %}selected{% endif %}>
+              {{ s.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Memo</label>
+          <input type="text" name="memo" class="form-control"
+                 placeholder="Optional note"
+                 value="{{ variant.memo if variant and variant.memo else '' }}">
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <button type="submit" class="btn btn-primary">
+          {{ 'Update' if variant else 'Create' }}
+        </button>
+        <a href="{{ url_for('purchase.list_variants') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
