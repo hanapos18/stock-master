@@ -1,8 +1,10 @@
 """POS 연동 API 라우트 — Webhook 수신 및 수동 동기화"""
+from datetime import date
 from flask import Blueprint, request, jsonify, session
 import config
 from app.controllers import pos_sync_controller
-from app.db import fetch_one
+from app.controllers.inventory_controller import load_product_lots
+from app.db import fetch_one, fetch_all
 
 pos_sync_bp = Blueprint("pos_sync", __name__, url_prefix="/api/pos")
 
@@ -120,6 +122,10 @@ def webhook():
         result = pos_sync_controller.handle_employee_sync(
             business_id, items,
         )
+    elif sync_type == "stock_restore":
+        result = pos_sync_controller.handle_stock_restore(
+            business_id, store_id, items,
+        )
     else:
         return jsonify({"success": False, "error": f"Unknown type: {sync_type}"}), 400
     # 동기화 상세 로그 기록
@@ -209,3 +215,38 @@ def sync_status():
         return jsonify({"success": False, "error": "business_id required"}), 400
     status = pos_sync_controller.load_sync_status(business_id)
     return jsonify({"success": True, "data": status})
+
+
+@pos_sync_bp.route("/lots/<menu_code>", methods=["GET"])
+def get_product_lots(menu_code: str):
+    """POS에서 상품의 유통기한별 로트 목록을 조회합니다 (API Key 인증).
+
+    GET /api/pos/lots/<menu_code>
+    Headers: X-API-Key: <POS_API_KEY>
+
+    응답: {"lots": [{"lot_id": 42, "expiry_date": "2026-08-15", "quantity": 10.0, "days_left": 36, "location": "warehouse"}, ...]}
+    """
+    if not _verify_api_key():
+        return jsonify({"success": False, "error": "Invalid API key"}), 401
+    biz = _resolve_business(request.args.to_dict())
+    if not biz.get("business_id") or not biz.get("store_id"):
+        biz = _resolve_business({})
+    if not biz.get("business_id") or not biz.get("store_id"):
+        return jsonify({"lots": []})
+    product = pos_sync_controller.find_product_by_mcode(biz["business_id"], menu_code)
+    if not product:
+        return jsonify({"lots": []})
+    lots = load_product_lots(product["id"], biz["store_id"], location="warehouse")
+    today = date.today()
+    result = []
+    for lot in lots:
+        exp = lot.get("expiry_date")
+        days_left = (exp - today).days if exp else None
+        result.append({
+            "lot_id": lot["id"],
+            "expiry_date": str(exp) if exp else None,
+            "quantity": float(lot["quantity"]),
+            "days_left": days_left,
+            "location": lot.get("location", "warehouse"),
+        })
+    return jsonify({"lots": result})

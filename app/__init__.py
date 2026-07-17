@@ -19,6 +19,7 @@ def create_app() -> Flask:
     _register_context_processors(application)
     _register_template_filters(application)
     _register_error_handlers(application)
+    _register_license_middleware(application)
     return application
 
 
@@ -43,6 +44,7 @@ def _register_blueprints(application: Flask) -> None:
     from app.routes.pos_sync_routes import pos_sync_bp
     from app.routes.transfer_routes import transfer_bp
     from app.routes.user_routes import user_bp
+    from app.routes.license_routes import license_bp
     application.register_blueprint(auth_bp)
     application.register_blueprint(dashboard_bp)
     application.register_blueprint(business_bp)
@@ -62,6 +64,7 @@ def _register_blueprints(application: Flask) -> None:
     application.register_blueprint(pos_sync_bp)
     application.register_blueprint(transfer_bp)
     application.register_blueprint(user_bp)
+    application.register_blueprint(license_bp)
 
 
 def _register_template_filters(application: Flask) -> None:
@@ -156,3 +159,43 @@ def _register_context_processors(application: Flask) -> None:
             "current_business": session.get("business"),
             "current_store": session.get("store"),
         }
+
+
+def _register_license_middleware(application: Flask) -> None:
+    """라이센스 검증 미들웨어를 등록합니다.
+    미인증 시 /license/activate로 리다이렉트.
+    POS Webhook, 정적 파일, 라이센스 페이지는 항상 허용.
+    """
+    from flask import request, redirect, url_for, g
+    from app.utils.license import check_license, get_license_status
+
+    ALWAYS_ALLOWED = (
+        "/license/",
+        "/static/",
+        "/api/pos/",
+        "/favicon.ico",
+    )
+
+    @application.before_request
+    def check_license_middleware():
+        path = request.path
+        for allowed in ALWAYS_ALLOWED:
+            if path.startswith(allowed):
+                return None
+        valid, message, info = check_license()
+        g.stk_license_valid = valid
+        g.stk_license_message = message
+        g.stk_license_info = info
+        if not valid:
+            print(f"[STK 라이센스] 미인증 접근 차단: {path}")
+            return redirect(url_for("license.activate"))
+        return None
+
+    @application.context_processor
+    def inject_license_info() -> dict:
+        return {
+            "stk_license_valid": getattr(g, "stk_license_valid", False),
+            "stk_license_message": getattr(g, "stk_license_message", ""),
+        }
+
+    print("  [STK 라이센스] 미들웨어 등록 완료")

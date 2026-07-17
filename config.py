@@ -1,8 +1,13 @@
 """Hana StockMaster 앱 설정"""
 import os
+import sys
 from dotenv import load_dotenv
 
-load_dotenv()
+if getattr(sys, "frozen", False):
+    _base_dir = os.path.dirname(sys.executable)
+else:
+    _base_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_base_dir, ".env"))
 
 SECRET_KEY: str = os.getenv("SECRET_KEY", "stockmaster-default-secret")
 DB_HOST: str = os.getenv("DB_HOST", "localhost")

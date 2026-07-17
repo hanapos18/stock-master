@@ -44,6 +44,12 @@ def handle_sale(business_id: int, business_type: str, store_id: int,
     for item in items:
         menu_code = str(item.get("menu_code", "")).strip()
         quantity = float(item.get("quantity", 0))
+        lot_id = item.get("lot_id")
+        if lot_id is not None:
+            try:
+                lot_id = int(lot_id)
+            except (TypeError, ValueError):
+                lot_id = None
         if not menu_code or quantity <= 0:
             result["skipped"] += 1
             continue
@@ -56,7 +62,7 @@ def handle_sale(business_id: int, business_type: str, store_id: int,
             else:
                 _handle_mart_sale(
                     business_id, store_id, menu_code, quantity, user_id,
-                    process_stock_out, result,
+                    process_stock_out, result, lot_id=lot_id,
                 )
         except Exception as e:
             result["errors"].append(f"{menu_code}: {str(e)}")
@@ -89,20 +95,32 @@ def _handle_restaurant_sale(business_id: int, store_id: int,
 def _handle_mart_sale(business_id: int, store_id: int,
                       menu_code: str, quantity: float,
                       user_id: Optional[int],
-                      process_stock_out, result: Dict) -> None:
-    """마트: mcode로 상품 직접 차감."""
+                      process_stock_out, result: Dict,
+                      lot_id: Optional[int] = None) -> None:
+    """마트: mcode로 상품 직접 차감. lot_id가 있으면 해당 로트에서 지정 차감."""
     product = find_product_by_mcode(business_id, menu_code)
-    if product:
+    if not product:
+        result["skipped"] += 1
+        print(f"  ⚠️ 상품 없음 (mcode={menu_code}) - 건너뜀")
+        return
+    if lot_id:
+        from app.controllers.inventory_controller import process_lot_stock_out
+        process_lot_stock_out(
+            lot_deductions=[{"inventory_id": lot_id, "quantity": quantity}],
+            store_id=store_id,
+            reason=f"POS Sale (mcode={menu_code}, lot={lot_id})",
+            user_id=user_id,
+        )
+        result["processed"] += 1
+        print(f"  🛒 로트 지정 차감: {product['name']} x{quantity} (lot_id={lot_id})")
+    else:
         process_stock_out(
             product_id=product["id"], store_id=store_id,
             quantity=quantity, reason=f"POS Sale (mcode={menu_code})",
             user_id=user_id,
         )
         result["processed"] += 1
-        print(f"  🛒 직접 차감: {product['name']} x{quantity}")
-    else:
-        result["skipped"] += 1
-        print(f"  ⚠️ 상품 없음 (mcode={menu_code}) - 건너뜀")
+        print(f"  🛒 FEFO 자동 차감: {product['name']} x{quantity}")
 
 
 def handle_stock_in(business_id: int, store_id: int,
@@ -163,6 +181,55 @@ def handle_loss(business_id: int, store_id: int,
             else:
                 result["skipped"] += 1
                 print(f"  ⚠️ 상품 없음 (mcode={menu_code}) - 건너뜀")
+        except Exception as e:
+            result["errors"].append(f"{menu_code}: {str(e)}")
+    return result
+
+
+def handle_stock_restore(business_id: int, store_id: int,
+                         items: List[Dict], user_id: Optional[int] = None) -> Dict:
+    """POS Void/Refund 시 재고 복원. lot_id가 있으면 해당 로트에 입고, 없으면 일반 입고."""
+    from app.controllers.inventory_controller import process_stock_in, _upsert_inventory, _sync_to_pos
+    result = {"processed": 0, "skipped": 0, "errors": []}
+    for item in items:
+        menu_code = str(item.get("menu_code", "")).strip()
+        quantity = float(item.get("quantity", 0))
+        lot_id = item.get("lot_id")
+        if not menu_code or quantity <= 0:
+            result["skipped"] += 1
+            continue
+        try:
+            product = find_product_by_mcode(business_id, menu_code)
+            if not product:
+                result["skipped"] += 1
+                print(f"  ⚠️ 복원 스킵 - 상품 없음 (mcode={menu_code})")
+                continue
+            if lot_id:
+                from app.db import fetch_one as _fone, execute as _exec
+                lot = _fone("SELECT id, product_id FROM stk_inventory WHERE id = %s", (lot_id,))
+                if lot:
+                    _exec("UPDATE stk_inventory SET quantity = quantity + %s WHERE id = %s", (quantity, lot_id))
+                    _sync_to_pos(product["id"], store_id)
+                    result["processed"] += 1
+                    print(f"  ♻️ 로트 복원: {product['name']} +{quantity} (lot_id={lot_id})")
+                else:
+                    process_stock_in(
+                        product_id=product["id"], store_id=store_id,
+                        quantity=quantity, location="warehouse",
+                        reason=f"POS Restore (mcode={menu_code})",
+                        user_id=user_id,
+                    )
+                    result["processed"] += 1
+                    print(f"  ♻️ 일반 복원 (로트 미발견): {product['name']} +{quantity}")
+            else:
+                process_stock_in(
+                    product_id=product["id"], store_id=store_id,
+                    quantity=quantity, location="warehouse",
+                    reason=f"POS Restore (mcode={menu_code})",
+                    user_id=user_id,
+                )
+                result["processed"] += 1
+                print(f"  ♻️ 일반 복원: {product['name']} +{quantity}")
         except Exception as e:
             result["errors"].append(f"{menu_code}: {str(e)}")
     return result
