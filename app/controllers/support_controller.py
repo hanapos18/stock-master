@@ -1,5 +1,6 @@
 """Support Request System — 소모품 주문/A/S 접수 비즈니스 로직"""
 import json
+import threading
 from typing import Dict, List, Optional
 from app.db import fetch_one, fetch_all, insert, execute
 
@@ -83,9 +84,9 @@ def delete_video(video_id: int) -> int:
 # ─── 접수 관리 ───────────────────────────────────────────────
 
 def create_request(data: Dict) -> int:
-    """POS에서 접수된 요청을 저장합니다."""
+    """POS에서 접수된 요청을 저장하고 이메일 알림을 발송합니다."""
     items_json = json.dumps(data.get("items", []), ensure_ascii=False)
-    return insert(
+    request_id = insert(
         "INSERT INTO stk_support_requests "
         "(store_code, store_name, terminal_id, request_type, items, memo) "
         "VALUES (%s, %s, %s, %s, %s, %s)",
@@ -93,6 +94,60 @@ def create_request(data: Dict) -> int:
          data.get("terminal_id", ""), data["request_type"],
          items_json, data.get("memo", "")),
     )
+    threading.Thread(target=_send_notification_email, args=(request_id, data), daemon=True).start()
+    return request_id
+
+
+def _send_notification_email(request_id: int, data: Dict):
+    """새 접수 알림 이메일을 비동기로 발송합니다."""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    try:
+        import config
+        if not config.SMTP_PASSWORD:
+            print("⚠️ SMTP_PASSWORD 미설정 — 이메일 알림 스킵")
+            return
+        request_type = data.get("request_type", "?")
+        store_name = data.get("store_name", "") or data.get("store_code", "Unknown")
+        items = data.get("items", [])
+        memo = data.get("memo", "")
+        subject = f"[HANAPOS Support] New {request_type} Request #{request_id} from {store_name}"
+        items_text = ""
+        for item in items:
+            if isinstance(item, dict):
+                name = item.get("name", item.get("category", ""))
+                qty = item.get("qty", item.get("quantity", 1))
+                items_text += f"  - {name} (x{qty})\n"
+            else:
+                items_text += f"  - {item}\n"
+        body = f"""New Support Request Received!
+
+ID: #{request_id}
+Type: {request_type}
+Store: {store_name}
+Terminal: {data.get('terminal_id', '-')}
+
+Items:
+{items_text if items_text else '  (none)'}
+
+Memo: {memo or '(none)'}
+
+---
+View: http://211.188.58.193:5556/support/{request_id}
+"""
+        msg = MIMEMultipart()
+        msg["From"] = config.SMTP_USER
+        msg["To"] = config.NOTIFY_EMAIL
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT) as server:
+            server.starttls()
+            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
+            server.sendmail(config.SMTP_USER, config.NOTIFY_EMAIL, msg.as_string())
+        print(f"✅ 알림 이메일 발송 완료: #{request_id} → {config.NOTIFY_EMAIL}")
+    except Exception as e:
+        print(f"⚠️ 알림 이메일 발송 실패: {e}")
 
 
 def get_requests(status: Optional[str] = None, store_code: Optional[str] = None,
