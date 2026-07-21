@@ -45,6 +45,7 @@ def _register_blueprints(application: Flask) -> None:
     from app.routes.transfer_routes import transfer_bp
     from app.routes.user_routes import user_bp
     from app.routes.license_routes import license_bp
+    from app.routes.support_routes import support_bp, support_api_bp
     application.register_blueprint(auth_bp)
     application.register_blueprint(dashboard_bp)
     application.register_blueprint(business_bp)
@@ -65,6 +66,8 @@ def _register_blueprints(application: Flask) -> None:
     application.register_blueprint(transfer_bp)
     application.register_blueprint(user_bp)
     application.register_blueprint(license_bp)
+    application.register_blueprint(support_bp)
+    application.register_blueprint(support_api_bp)
 
 
 def _register_template_filters(application: Flask) -> None:

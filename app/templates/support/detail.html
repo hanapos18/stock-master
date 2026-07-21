@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Request #{{ req.id }} - Support{% endblock %}
+{% block page_title %}Request #{{ req.id }}{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="col-md-8">
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between">
+        <span>
+          {% if req.request_type == 'ORDER' %}
+          <span class="badge bg-primary">Order</span>
+          {% else %}
+          <span class="badge bg-warning text-dark">A/S Request</span>
+          {% endif %}
+          from <strong>{{ req.store_name or req.store_code }}</strong>
+          ({{ req.terminal_id }})
+        </span>
+        <span class="text-muted">{{ req.created_at.strftime('%Y-%m-%d %H:%M') if req.created_at else '' }}</span>
+      </div>
+      <div class="card-body">
+        {% if req.request_type == 'ORDER' and req.items %}
+        <h6>Ordered Items</h6>
+        <table class="table table-sm">
+          <thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead>
+          <tbody>
+          {% for item in req.items %}
+          <tr>
+            <td>{{ item.name if item.name else item.get('catalog_id','?') }}</td>
+            <td>{{ item.qty if item.qty else item.get('quantity', 1) }}</td>
+            <td>{{ item.unit_price if item.unit_price else '-' }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% elif req.request_type == 'AS' and req.items %}
+        <h6>Equipment</h6>
+        <ul class="list-group list-group-flush mb-3">
+          {% for item in req.items %}
+          <li class="list-group-item">{{ item.category if item.category else item }} — {{ item.description if item.description else '' }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        {% if req.memo %}
+        <h6>Memo</h6>
+        <p class="border rounded p-2 bg-light">{{ req.memo }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- 해결 기록 (DONE 상태일 때 표시) -->
+    {% if req.status == 'DONE' and req.resolution %}
+    <div class="card mb-3 border-success">
+      <div class="card-header bg-success text-white">
+        <i class="bi bi-check-circle-fill me-1"></i>Resolution Record (5W1H)
+      </div>
+      <div class="card-body">
+        <table class="table table-sm table-borderless mb-0">
+          <tbody>
+            <tr><th style="width:120px;" class="text-muted">Who (누가)</th><td>{{ req.resolved_by or '-' }}</td></tr>
+            <tr><th class="text-muted">When (언제)</th><td>{{ req.resolved_at.strftime('%Y-%m-%d %H:%M') if req.resolved_at else '-' }}</td></tr>
+            <tr><th class="text-muted">Where (어디서)</th><td>{{ req.resolution_location or '-' }}</td></tr>
+            <tr><th class="text-muted">Why (원인)</th><td>{{ req.root_cause or '-' }}</td></tr>
+            <tr><th class="text-muted">How (해결)</th><td>{{ req.resolution or '-' }}</td></tr>
+            <tr><th class="text-muted">What (부품)</th><td>{{ req.parts_used or '-' }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header">Update Status</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('support.update_status', request_id=req.id) }}">
+          <div class="mb-3">
+            <label class="form-label">Status</label>
+            <select name="status" id="statusSelect" class="form-select" onchange="toggleResolutionForm()">
+              <option value="PENDING" {{ 'selected' if req.status=='PENDING' }}>Pending</option>
+              <option value="PROCESSING" {{ 'selected' if req.status=='PROCESSING' }}>Processing</option>
+              <option value="DONE" {{ 'selected' if req.status=='DONE' }}>Done</option>
+              <option value="REJECTED" {{ 'selected' if req.status=='REJECTED' }}>Rejected</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Admin Note</label>
+            <textarea name="admin_note" class="form-control" rows="2">{{ req.admin_note or '' }}</textarea>
+          </div>
+
+          <!-- 해결 기록 입력 (DONE 선택 시 표시) -->
+          <div id="resolutionForm" style="display:{{ 'block' if req.status=='DONE' else 'none' }};">
+            <hr>
+            <h6 class="text-success"><i class="bi bi-clipboard-check me-1"></i>Resolution (5W1H)</h6>
+            <div class="mb-2">
+              <label class="form-label small">Who (누가 해결)</label>
+              <input type="text" name="resolved_by" class="form-control form-control-sm" value="{{ req.resolved_by or '' }}" placeholder="Technician name">
+            </div>
+            <div class="mb-2">
+              <label class="form-label small">Where (어디서)</label>
+              <select name="resolution_location" class="form-select form-select-sm">
+                <option value="">-- Select --</option>
+                <option value="On-site" {{ 'selected' if req.resolution_location=='On-site' }}>On-site (현장)</option>
+                <option value="Remote" {{ 'selected' if req.resolution_location=='Remote' }}>Remote (원격)</option>
+                <option value="Workshop" {{ 'selected' if req.resolution_location=='Workshop' }}>Workshop (수리실)</option>
+                <option value="Phone" {{ 'selected' if req.resolution_location=='Phone' }}>Phone Guide (전화안내)</option>
+              </select>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small">Why (원인)</label>
+              <textarea name="root_cause" class="form-control form-control-sm" rows="2" placeholder="Root cause...">{{ req.root_cause or '' }}</textarea>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small">How (해결 방법)</label>
+              <textarea name="resolution" class="form-control form-control-sm" rows="2" placeholder="How was it resolved...">{{ req.resolution or '' }}</textarea>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small">What (사용 부품/자재)</label>
+              <input type="text" name="parts_used" class="form-control form-control-sm" value="{{ req.parts_used or '' }}" placeholder="e.g. Thermal head, cable...">
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 mt-2">Save</button>
+        </form>
+      </div>
+    </div>
+    <a href="{{ url_for('support.request_list') }}" class="btn btn-outline-secondary w-100 mt-2">Back to List</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleResolutionForm() {
+  const status = document.getElementById('statusSelect').value;
+  document.getElementById('resolutionForm').style.display = (status === 'DONE') ? 'block' : 'none';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Support Requests - Hana StockMaster{% endblock %}
+{% block page_title %}Support Requests{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <span class="badge bg-danger fs-6">{{ pending_count }} Pending</span>
+  </div>
+  <div class="d-flex gap-2">
+    <select class="form-select form-select-sm" id="statusFilter" style="width:auto;" onchange="applyFilter()">
+      <option value="">All Status</option>
+      <option value="PENDING" {{ 'selected' if status_filter=='PENDING' }}>Pending</option>
+      <option value="PROCESSING" {{ 'selected' if status_filter=='PROCESSING' }}>Processing</option>
+      <option value="DONE" {{ 'selected' if status_filter=='DONE' }}>Done</option>
+      <option value="REJECTED" {{ 'selected' if status_filter=='REJECTED' }}>Rejected</option>
+    </select>
+    <select class="form-select form-select-sm" id="typeFilter" style="width:auto;" onchange="applyFilter()">
+      <option value="">All Types</option>
+      <option value="ORDER" {{ 'selected' if type_filter=='ORDER' }}>Order</option>
+      <option value="AS" {{ 'selected' if type_filter=='AS' }}>A/S</option>
+    </select>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>Type</th>
+          <th>Store</th>
+          <th>Items / Issue</th>
+          <th>Status</th>
+          <th>Resolved By</th>
+          <th>Date</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for req in requests %}
+        <tr>
+          <td>{{ req.id }}</td>
+          <td>
+            {% if req.request_type == 'ORDER' %}
+            <span class="badge bg-primary">Order</span>
+            {% else %}
+            <span class="badge bg-warning text-dark">A/S</span>
+            {% endif %}
+          </td>
+          <td>{{ req.store_name or req.store_code }}</td>
+          <td class="text-truncate" style="max-width:250px;">
+            {% if req.items is iterable and req.items is not string %}
+              {{ req.items | length }} item(s)
+            {% else %}
+              {{ req.memo[:50] if req.memo else '-' }}
+            {% endif %}
+          </td>
+          <td>
+            {% if req.status == 'PENDING' %}
+            <span class="badge bg-danger">Pending</span>
+            {% elif req.status == 'PROCESSING' %}
+            <span class="badge bg-info">Processing</span>
+            {% elif req.status == 'DONE' %}
+            <span class="badge bg-success">Done</span>
+            {% else %}
+            <span class="badge bg-secondary">{{ req.status }}</span>
+            {% endif %}
+          </td>
+          <td class="small">{{ req.resolved_by or '' }}</td>
+          <td>{{ req.created_at.strftime('%m/%d %H:%M') if req.created_at else '' }}</td>
+          <td><a href="{{ url_for('support.request_detail', request_id=req.id) }}" class="btn btn-sm btn-outline-primary">View</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No requests found</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function applyFilter() {
+  const status = document.getElementById('statusFilter').value;
+  const type = document.getElementById('typeFilter').value;
+  let url = '{{ url_for("support.request_list") }}?';
+  if (status) url += 'status=' + status + '&';
+  if (type) url += 'type=' + type;
+  window.location.href = url;
+}
+
+// 30초 폴링: 새 접수 알림
+let lastCount = {{ pending_count }};
+setInterval(async () => {
+  try {
+    const res = await fetch('{{ url_for("support.unread_count") }}');
+    const data = await res.json();
+    const badge = document.querySelector('.support-badge');
+    if (data.count > 0) {
+      badge.textContent = data.count;
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
+    if (data.count > lastCount && Notification.permission === 'granted') {
+      new Notification('New Support Request', {body: `${data.count} pending request(s)`});
+    }
+    lastCount = data.count;
+  } catch(e) {}
+}, 30000);
+
+if (Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+</script>
+{% endblock %}
