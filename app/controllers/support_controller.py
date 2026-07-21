@@ -125,8 +125,15 @@ def _send_fcm_notification(request_id: int, data: Dict):
             body += "\n"
         items = data.get("items", [])
         if items:
-            names = [i.get("name", "") if isinstance(i, dict) else str(i) for i in items[:3]]
-            body += ", ".join(n for n in names if n)
+            parts = []
+            for i in items[:3]:
+                if isinstance(i, dict):
+                    name = i.get("name", "") or i.get("category", "")
+                    qty = i.get("qty", i.get("quantity", 1))
+                    parts.append(f"{name} x{qty}" if name else "")
+                else:
+                    parts.append(str(i))
+            body += ", ".join(p for p in parts if p)
             if len(items) > 3:
                 body += f" +{len(items)-3} more"
         base_url = config.MULTITENANT_API_URL.rstrip('/')
