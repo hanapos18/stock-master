@@ -98,6 +98,17 @@ with conn.cursor() as cur:
         """)
         print("[OK] 유튜브 샘플 데이터 삽입 (4건)")
 
+# 발신자/신청자 정보 컬럼 추가
+with conn.cursor() as cur:
+    cur.execute("""
+        ALTER TABLE stk_support_requests
+            ADD COLUMN IF NOT EXISTS store_address VARCHAR(200) DEFAULT NULL COMMENT '매장 주소',
+            ADD COLUMN IF NOT EXISTS store_phone VARCHAR(50) DEFAULT NULL COMMENT '매장 전화번호',
+            ADD COLUMN IF NOT EXISTS requester_name VARCHAR(100) DEFAULT NULL COMMENT '신청자 이름',
+            ADD COLUMN IF NOT EXISTS requester_phone VARCHAR(50) DEFAULT NULL COMMENT '신청자 연락처'
+    """)
+    print("[OK] requester/store contact columns added")
+
 # 확인
 with conn.cursor() as cur:
     cur.execute("SHOW TABLES LIKE 'stk_support%%'")

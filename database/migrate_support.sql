@@ -58,6 +58,13 @@ ALTER TABLE stk_support_requests
     ADD COLUMN IF NOT EXISTS resolution TEXT DEFAULT NULL COMMENT '어떻게 (해결방법)',
     ADD COLUMN IF NOT EXISTS parts_used TEXT DEFAULT NULL COMMENT '무엇을 (사용부품/자재)';
 
+-- 발신자/신청자 정보 컬럼 추가
+ALTER TABLE stk_support_requests
+    ADD COLUMN IF NOT EXISTS store_address VARCHAR(200) DEFAULT NULL COMMENT '매장 주소',
+    ADD COLUMN IF NOT EXISTS store_phone VARCHAR(50) DEFAULT NULL COMMENT '매장 전화번호',
+    ADD COLUMN IF NOT EXISTS requester_name VARCHAR(100) DEFAULT NULL COMMENT '신청자 이름',
+    ADD COLUMN IF NOT EXISTS requester_phone VARCHAR(50) DEFAULT NULL COMMENT '신청자 연락처';
+
 -- 초기 카탈로그 샘플 데이터
 INSERT INTO stk_support_catalog (category, name, description, unit_price, sort_order) VALUES
 ('PAPER', 'Thermal Paper 57mm (50 rolls)', 'Standard receipt paper for 57mm printers', 850.00, 1),

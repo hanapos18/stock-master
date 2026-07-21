@@ -90,11 +90,14 @@ def create_request(data: Dict) -> int:
     items_json = json.dumps(data.get("items", []), ensure_ascii=False)
     request_id = insert(
         "INSERT INTO stk_support_requests "
-        "(store_code, store_name, terminal_id, request_type, items, memo) "
-        "VALUES (%s, %s, %s, %s, %s, %s)",
+        "(store_code, store_name, terminal_id, request_type, items, memo, "
+        "store_address, store_phone, requester_name, requester_phone) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
         (data["store_code"], data.get("store_name", ""),
          data.get("terminal_id", ""), data["request_type"],
-         items_json, data.get("memo", "")),
+         items_json, data.get("memo", ""),
+         data.get("store_address", ""), data.get("store_phone", ""),
+         data.get("requester_name", ""), data.get("requester_phone", "")),
     )
     threading.Thread(target=_send_fcm_notification, args=(request_id, data), daemon=True).start()
     return request_id
@@ -111,17 +114,21 @@ def _send_fcm_notification(request_id: int, data: Dict):
             return
         request_type = data.get("request_type", "ORDER")
         store_name = data.get("store_name", "") or data.get("store_code", "Unknown")
+        requester = data.get("requester_name", "")
+        requester_phone = data.get("requester_phone", "")
         title = f"🔧 Support #{request_id} — {request_type}"
         body = f"Store: {store_name}\n"
+        if requester:
+            body += f"From: {requester}"
+            if requester_phone:
+                body += f" ({requester_phone})"
+            body += "\n"
         items = data.get("items", [])
         if items:
             names = [i.get("name", "") if isinstance(i, dict) else str(i) for i in items[:3]]
             body += ", ".join(n for n in names if n)
             if len(items) > 3:
                 body += f" +{len(items)-3} more"
-        memo = data.get("memo", "")
-        if memo:
-            body += f"\nMemo: {memo[:50]}"
         base_url = config.MULTITENANT_API_URL.rstrip('/')
         url = f"{base_url}/api/internal/support-alert"
         resp = http_requests.post(url, json={
