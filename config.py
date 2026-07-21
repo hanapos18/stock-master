@@ -30,9 +30,7 @@ PRINTER_ENCODING: str = os.getenv("PRINTER_ENCODING", "euc-kr")  # euc-kr for Ko
 BAEKWON_POS_API_KEY: str = os.getenv("BAEKWON_POS_API_KEY", "baekwon-bridge-key")
 BAEKWON_SYNC_ENABLED: bool = os.getenv("BAEKWON_SYNC_ENABLED", "true").lower() == "true"
 
-# Email Notification (Gmail SMTP)
-SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER: str = os.getenv("SMTP_USER", "hanapos.service@gmail.com")
-SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
-NOTIFY_EMAIL: str = os.getenv("NOTIFY_EMAIL", "hanapos.service@gmail.com")
+# FCM Notification via hanapos_multitenant
+MULTITENANT_API_URL: str = os.getenv("MULTITENANT_API_URL", "http://localhost:5000")
+SYNC_API_KEY: str = os.getenv("SYNC_API_KEY", "")
+SUPPORT_NOTIFY_STORE: str = os.getenv("SUPPORT_NOTIFY_STORE", "MAPLE_TEST01")

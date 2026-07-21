@@ -1,8 +1,13 @@
 """Support Request System — 소모품 주문/A/S 접수 비즈니스 로직"""
 import json
+import os
 import threading
 from typing import Dict, List, Optional
 from app.db import fetch_one, fetch_all, insert, execute
+
+MULTITENANT_URL = os.environ.get("MULTITENANT_API_URL", "http://localhost:5000")
+SYNC_API_KEY = os.environ.get("SYNC_API_KEY", "")
+SUPPORT_NOTIFY_STORE = os.environ.get("SUPPORT_NOTIFY_STORE", "")
 
 
 # ─── 카탈로그 관리 ───────────────────────────────────────────
@@ -84,7 +89,7 @@ def delete_video(video_id: int) -> int:
 # ─── 접수 관리 ───────────────────────────────────────────────
 
 def create_request(data: Dict) -> int:
-    """POS에서 접수된 요청을 저장하고 이메일 알림을 발송합니다."""
+    """POS에서 접수된 요청을 저장하고 FCM 알림을 발송합니다."""
     items_json = json.dumps(data.get("items", []), ensure_ascii=False)
     request_id = insert(
         "INSERT INTO stk_support_requests "
@@ -94,60 +99,42 @@ def create_request(data: Dict) -> int:
          data.get("terminal_id", ""), data["request_type"],
          items_json, data.get("memo", "")),
     )
-    threading.Thread(target=_send_notification_email, args=(request_id, data), daemon=True).start()
+    threading.Thread(target=_send_fcm_notification, args=(request_id, data), daemon=True).start()
     return request_id
 
 
-def _send_notification_email(request_id: int, data: Dict):
-    """새 접수 알림 이메일을 비동기로 발송합니다."""
-    import smtplib
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
+def _send_fcm_notification(request_id: int, data: Dict):
+    """새 접수 시 hanapos_multitenant를 경유하여 FCM Push를 HanaPosNotifier 앱으로 발송합니다."""
+    import requests as http_requests
     try:
-        import config
-        if not config.SMTP_PASSWORD:
-            print("⚠️ SMTP_PASSWORD 미설정 — 이메일 알림 스킵")
+        if not SYNC_API_KEY:
+            print("⚠️ SYNC_API_KEY 미설정 — FCM 알림 스킵")
             return
-        request_type = data.get("request_type", "?")
+        request_type = data.get("request_type", "ORDER")
         store_name = data.get("store_name", "") or data.get("store_code", "Unknown")
+        title = f"🔧 Support #{request_id} — {request_type}"
+        body = f"Store: {store_name}\n"
         items = data.get("items", [])
+        if items:
+            names = [i.get("name", "") if isinstance(i, dict) else str(i) for i in items[:3]]
+            body += ", ".join(n for n in names if n)
+            if len(items) > 3:
+                body += f" +{len(items)-3} more"
         memo = data.get("memo", "")
-        subject = f"[HANAPOS Support] New {request_type} Request #{request_id} from {store_name}"
-        items_text = ""
-        for item in items:
-            if isinstance(item, dict):
-                name = item.get("name", item.get("category", ""))
-                qty = item.get("qty", item.get("quantity", 1))
-                items_text += f"  - {name} (x{qty})\n"
-            else:
-                items_text += f"  - {item}\n"
-        body = f"""New Support Request Received!
-
-ID: #{request_id}
-Type: {request_type}
-Store: {store_name}
-Terminal: {data.get('terminal_id', '-')}
-
-Items:
-{items_text if items_text else '  (none)'}
-
-Memo: {memo or '(none)'}
-
----
-View: http://211.188.58.193:5556/support/{request_id}
-"""
-        msg = MIMEMultipart()
-        msg["From"] = config.SMTP_USER
-        msg["To"] = config.NOTIFY_EMAIL
-        msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain"))
-        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT) as server:
-            server.starttls()
-            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-            server.sendmail(config.SMTP_USER, config.NOTIFY_EMAIL, msg.as_string())
-        print(f"✅ 알림 이메일 발송 완료: #{request_id} → {config.NOTIFY_EMAIL}")
+        if memo:
+            body += f"\nMemo: {memo[:50]}"
+        url = f"{MULTITENANT_URL.rstrip('/')}/api/internal/support-alert"
+        resp = http_requests.post(url, json={
+            "title": title,
+            "body": body,
+            "store_number": SUPPORT_NOTIFY_STORE,
+        }, headers={"X-Sync-Api-Key": SYNC_API_KEY}, timeout=10)
+        if resp.status_code == 200:
+            print(f"✅ FCM 알림 발송 완료: #{request_id}")
+        else:
+            print(f"⚠️ FCM 알림 발송 실패 (HTTP {resp.status_code}): {resp.text[:100]}")
     except Exception as e:
-        print(f"⚠️ 알림 이메일 발송 실패: {e}")
+        print(f"⚠️ FCM 알림 발송 실패: {e}")
 
 
 def get_requests(status: Optional[str] = None, store_code: Optional[str] = None,
