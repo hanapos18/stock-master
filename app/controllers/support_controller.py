@@ -5,9 +5,6 @@ import threading
 from typing import Dict, List, Optional
 from app.db import fetch_one, fetch_all, insert, execute
 
-MULTITENANT_URL = os.environ.get("MULTITENANT_API_URL", "http://localhost:5000")
-SYNC_API_KEY = os.environ.get("SYNC_API_KEY", "")
-SUPPORT_NOTIFY_STORE = os.environ.get("SUPPORT_NOTIFY_STORE", "")
 
 
 # ─── 카탈로그 관리 ───────────────────────────────────────────
@@ -106,8 +103,10 @@ def create_request(data: Dict) -> int:
 def _send_fcm_notification(request_id: int, data: Dict):
     """새 접수 시 hanapos_multitenant를 경유하여 FCM Push를 HanaPosNotifier 앱으로 발송합니다."""
     import requests as http_requests
+    import config
     try:
-        if not SYNC_API_KEY:
+        sync_key = config.SYNC_API_KEY
+        if not sync_key:
             print("⚠️ SYNC_API_KEY 미설정 — FCM 알림 스킵")
             return
         request_type = data.get("request_type", "ORDER")
@@ -123,12 +122,13 @@ def _send_fcm_notification(request_id: int, data: Dict):
         memo = data.get("memo", "")
         if memo:
             body += f"\nMemo: {memo[:50]}"
-        url = f"{MULTITENANT_URL.rstrip('/')}/api/internal/support-alert"
+        base_url = config.MULTITENANT_API_URL.rstrip('/')
+        url = f"{base_url}/api/internal/support-alert"
         resp = http_requests.post(url, json={
             "title": title,
             "body": body,
-            "store_number": SUPPORT_NOTIFY_STORE,
-        }, headers={"X-Sync-Api-Key": SYNC_API_KEY}, timeout=10)
+            "store_number": config.SUPPORT_NOTIFY_STORE,
+        }, headers={"X-Sync-Api-Key": sync_key}, timeout=10)
         if resp.status_code == 200:
             print(f"✅ FCM 알림 발송 완료: #{request_id}")
         else:
