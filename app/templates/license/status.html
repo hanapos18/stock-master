@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}License Status{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="bi bi-shield-check"></i> License Status</h5>
+        </div>
+        <div class="card-body">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'danger' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+          {% endwith %}
+
+          {% if status.activated %}
+          <div class="alert alert-{{ 'success' if status.status in ('active', 'permanent') else 'warning' if status.status == 'warning' else 'danger' }}">
+            <i class="bi bi-{{ 'check-circle-fill' if status.status in ('active', 'permanent') else 'exclamation-triangle-fill' }}"></i>
+            {{ status.message }}
+          </div>
+          {% else %}
+          <div class="alert alert-danger">
+            <i class="bi bi-x-circle-fill"></i> {{ status.message }}
+          </div>
+          {% endif %}
+
+          <table class="table table-bordered mb-0">
+            <tr>
+              <th class="bg-light" style="width:40%;">Machine ID</th>
+              <td><code>{{ machine_id }}</code></td>
+            </tr>
+            {% if status.activated %}
+            <tr>
+              <th class="bg-light">License Key</th>
+              <td><code>{{ status.license_key }}</code></td>
+            </tr>
+            <tr>
+              <th class="bg-light">Period</th>
+              <td>{{ status.period_label }}</td>
+            </tr>
+            <tr>
+              <th class="bg-light">Activated</th>
+              <td>{{ status.activated_at }}</td>
+            </tr>
+            {% if status.expires_at %}
+            <tr>
+              <th class="bg-light">Expires</th>
+              <td>{{ status.expires_at }}</td>
+            </tr>
+            <tr>
+              <th class="bg-light">Days Remaining</th>
+              <td>
+                {% if status.days_remaining > 30 %}
+                <span class="badge bg-success">{{ status.days_remaining }} days</span>
+                {% elif status.days_remaining > 7 %}
+                <span class="badge bg-warning text-dark">{{ status.days_remaining }} days</span>
+                {% else %}
+                <span class="badge bg-danger">{{ status.days_remaining }} days</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endif %}
+            {% endif %}
+            <tr>
+              <th class="bg-light">Status</th>
+              <td>
+                {% if status.status == 'permanent' %}
+                <span class="badge bg-primary">Permanent</span>
+                {% elif status.status == 'active' %}
+                <span class="badge bg-success">Active</span>
+                {% elif status.status == 'warning' %}
+                <span class="badge bg-warning text-dark">Expiring Soon</span>
+                {% elif status.status == 'critical' %}
+                <span class="badge bg-danger">Critical</span>
+                {% elif status.status == 'expired' %}
+                <span class="badge bg-dark">Expired</span>
+                {% else %}
+                <span class="badge bg-secondary">Not Activated</span>
+                {% endif %}
+              </td>
+            </tr>
+          </table>
+        </div>
+        <div class="card-footer d-flex justify-content-between">
+          <a href="{{ url_for('license.activate') }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-key"></i> {{ 'Change License' if status.activated else 'Activate' }}
+          </a>
+          {% if status.activated and current_user and current_user.role == 'admin' %}
+          <form method="POST" action="{{ url_for('license.deactivate') }}" onsubmit="return confirm('Are you sure you want to deactivate the license?');">
+            <button type="submit" class="btn btn-outline-danger btn-sm">
+              <i class="bi bi-x-lg"></i> Deactivate
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

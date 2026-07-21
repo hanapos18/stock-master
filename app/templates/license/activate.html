@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockMaster - License Activation</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .license-card { max-width: 520px; width: 100%; border: none; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+    .license-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 16px 16px 0 0; padding: 2rem; text-align: center; }
+    .license-header h3 { margin: 0; font-weight: 700; }
+    .license-header p { margin: 0.5rem 0 0; opacity: 0.9; font-size: 0.9rem; }
+    .machine-id-box { background: #f8f9fa; border: 1px dashed #dee2e6; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 1.1rem; letter-spacing: 2px; text-align: center; color: #495057; cursor: pointer; }
+    .machine-id-box:hover { background: #e9ecef; }
+    .form-control-lg { border-radius: 10px; }
+    .btn-activate { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 10px; padding: 12px; font-weight: 600; font-size: 1.05rem; }
+    .btn-activate:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <div class="card license-card">
+    <div class="license-header">
+      <h3><i class="bi bi-shield-lock"></i> Hana StockMaster</h3>
+      <p>Premium Inventory Management</p>
+    </div>
+    <div class="card-body p-4">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'danger' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+      {% endwith %}
+
+      {% if status.activated %}
+      <div class="alert alert-success">
+        <i class="bi bi-check-circle-fill"></i> License is active.
+        <a href="{{ url_for('license.status_page') }}" class="alert-link">View Details</a>
+      </div>
+      {% endif %}
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Machine ID</label>
+        <div class="machine-id-box" onclick="copyMachineId()" title="Click to copy">{{ machine_id }}</div>
+        <small class="text-muted">Provide this ID to your dealer to receive a license key.</small>
+      </div>
+
+      <hr>
+
+      <form method="POST" action="{{ url_for('license.activate') }}">
+        <div class="mb-3">
+          <label for="license_key" class="form-label fw-semibold">License Key</label>
+          <input type="text" class="form-control form-control-lg" id="license_key" name="license_key"
+                 placeholder="STK-XXXXXXXX-PERM-XXXXXX" autocomplete="off" spellcheck="false"
+                 style="text-transform: uppercase;" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-activate w-100 btn-lg text-white">
+          <i class="bi bi-key"></i> Activate License
+        </button>
+      </form>
+    </div>
+    <div class="card-footer text-center text-muted py-3" style="border-radius: 0 0 16px 16px;">
+      <small>&copy; 2026 HANAPOS ENTERPRISES</small>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function copyMachineId() {
+      const mid = '{{ machine_id }}';
+      navigator.clipboard.writeText(mid).then(() => {
+        const box = document.querySelector('.machine-id-box');
+        const orig = box.textContent;
+        box.textContent = 'Copied!';
+        setTimeout(() => { box.textContent = orig; }, 1500);
+      });
+    }
+  </script>
+</body>
+</html>
